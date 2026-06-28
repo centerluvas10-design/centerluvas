@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Registro de Vendas — Insumos Odontológicos</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f7; color: #1d1d1f; min-height: 100vh; }
+  .container { max-width: 600px; margin: 0 auto; padding: 1.5rem 1rem; }
+  h1 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+  .sub { font-size: 13px; color: #6e6e73; margin-bottom: 1.5rem; }
+  .setup-banner { background: #fff3cd; border: 1px solid #ffc107; border-radius: 10px; padding: 14px 16px; margin-bottom: 1.25rem; font-size: 13px; color: #7a5c00; }
+  .setup-banner strong { display: block; margin-bottom: 6px; font-size: 14px; }
+  .setup-input { display: flex; gap: 8px; margin-top: 10px; }
+  .setup-input input { flex: 1; font-size: 13px; padding: 8px 12px; border: 1px solid #d1d1d6; border-radius: 8px; }
+  .setup-input button { background: #1d1d1f; color: #fff; border: none; border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer; white-space: nowrap; }
+  .connected { background: #d4edda; border-color: #28a745; color: #155724; }
+  .card { background: #fff; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .section-title { font-size: 11px; font-weight: 600; color: #6e6e73; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 12px; }
+  .field { margin-bottom: 12px; }
+  .field:last-child { margin-bottom: 0; }
+  label { display: block; font-size: 13px; color: #6e6e73; margin-bottom: 5px; font-weight: 500; }
+  input, select, textarea { width: 100%; font-size: 15px; padding: 10px 12px; border: 1px solid #d1d1d6; border-radius: 8px; background: #fff; color: #1d1d1f; appearance: none; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: #0071e3; }
+  textarea { resize: vertical; min-height: 70px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid3 { display: grid; grid-template-columns: 2fr 80px 100px 36px; gap: 8px; align-items: end; margin-bottom: 8px; }
+  .grid3 label { font-size: 12px; }
+  .remove-btn { background: none; border: 1px solid #d1d1d6; border-radius: 8px; color: #6e6e73; font-size: 20px; cursor: pointer; width: 36px; height: 40px; display: flex; align-items: center; justify-content: center; line-height: 1; }
+  .remove-btn:hover { background: #fff0f0; border-color: #ff3b30; color: #ff3b30; }
+  .add-btn { width: 100%; background: none; border: 1.5px dashed #d1d1d6; border-radius: 8px; color: #6e6e73; font-size: 14px; padding: 9px; cursor: pointer; margin-top: 4px; }
+  .add-btn:hover { background: #f5f5f7; }
+  .total-row { display: flex; justify-content: space-between; align-items: baseline; padding-top: 12px; margin-top: 8px; border-top: 1px solid #f0f0f0; }
+  .total-label { font-size: 14px; color: #6e6e73; }
+  .total-value { font-size: 26px; font-weight: 600; }
+  .submit-btn { width: 100%; background: #1d1d1f; color: #fff; border: none; border-radius: 10px; font-size: 16px; font-weight: 500; padding: 14px; cursor: pointer; margin-top: 4px; transition: opacity 0.15s; }
+  .submit-btn:hover { opacity: 0.85; }
+  .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .toast { display: none; position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1d1d1f; color: #fff; border-radius: 20px; padding: 12px 24px; font-size: 14px; z-index: 999; white-space: nowrap; }
+  .toast.show { display: block; }
+  .toast.error { background: #ff3b30; }
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid #e5e5ea; margin-bottom: 1.25rem; }
+  .tab { flex: 1; text-align: center; font-size: 14px; padding: 10px; border: none; background: none; cursor: pointer; color: #6e6e73; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tab.active { color: #1d1d1f; border-bottom-color: #1d1d1f; font-weight: 600; }
+  .pane { display: none; }
+  .pane.active { display: block; }
+  .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 1rem; }
+  .metric { background: #fff; border-radius: 10px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .metric-label { font-size: 11px; color: #6e6e73; margin-bottom: 4px; }
+  .metric-value { font-size: 20px; font-weight: 600; }
+  .sale-item { padding: 12px 0; border-bottom: 1px solid #f0f0f0; display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+  .sale-item:last-child { border-bottom: none; }
+  .sale-client { font-weight: 600; font-size: 15px; }
+  .sale-meta { font-size: 12px; color: #6e6e73; margin-top: 3px; }
+  .sale-right { text-align: right; }
+  .sale-total { font-weight: 600; font-size: 16px; }
+  .badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 20px; margin-top: 4px; }
+  .pix { background: #d4edda; color: #155724; }
+  .dinheiro { background: #fff3cd; color: #7a5c00; }
+  .cartao { background: #cce5ff; color: #004085; }
+  .fiado { background: #f8d7da; color: #721c24; }
+  .empty { text-align: center; padding: 2rem; color: #6e6e73; font-size: 14px; }
+  .sync-status { font-size: 12px; color: #6e6e73; text-align: center; margin-top: 8px; }
+  .sync-status.ok { color: #28a745; }
+  .sync-status.err { color: #ff3b30; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>⚙️ Registro de Vendas</h1>
+  <p class="sub">Insumos odontológicos &amp; descartáveis · Cariri</p>
+
+  <!-- Status Banner -->
+  <div class="setup-banner connected" id="setup-banner">
+    <strong>✅ Conectado ao Google Sheets</strong> Vendas enviadas em tempo real para a planilha.
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('registrar')">Nova venda</button>
+    <button class="tab" onclick="switchTab('historico')">Histórico</button>
+    <button class="tab" onclick="switchTab('resumo')">Resumo</button>
+  </div>
+
+  <!-- REGISTRAR -->
+  <div id="pane-registrar" class="pane active">
+    <div class="card">
+      <div class="section-title">Cliente</div>
+      <div class="grid2">
+        <div class="field">
+          <label>Nome ou clínica *</label>
+          <input type="text" id="cliente" placeholder="Ex: Dra. Ana Souza" />
+        </div>
+        <div class="field">
+          <label>Forma de pagamento *</label>
+          <select id="pagamento">
+            <option value="">Selecione</option>
+            <option value="pix">Pix</option>
+            <option value="dinheiro">Dinheiro</option>
+            <option value="cartao">Cartão</option>
+            <option value="fiado">Fiado</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Produtos</div>
+      <div id="products-list"></div>
+      <button class="add-btn" onclick="addLine()">+ Adicionar produto</button>
+      <div class="total-row">
+        <span class="total-label">Total da venda</span>
+        <span class="total-value" id="total-display">R$ 0,00</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Observação (opcional)</div>
+      <div class="field">
+        <textarea id="obs" placeholder="Ex: entrega na terça, cliente pediu NF..."></textarea>
+      </div>
+    </div>
+
+    <button class="submit-btn" id="submit-btn" onclick="registrarVenda()">Registrar venda</button>
+    <div class="sync-status" id="sync-status"></div>
+  </div>
+
+  <!-- HISTÓRICO -->
+  <div id="pane-historico" class="pane">
+    <div class="card">
+      <div class="section-title">Vendas registradas</div>
+      <div id="historico-list"><div class="empty">Nenhuma venda registrada ainda.</div></div>
+    </div>
+  </div>
+
+  <!-- RESUMO -->
+  <div id="pane-resumo" class="pane">
+    <div class="metrics">
+      <div class="metric"><div class="metric-label">Vendas</div><div class="metric-value" id="m-count">0</div></div>
+      <div class="metric"><div class="metric-label">Faturamento</div><div class="metric-value" id="m-total">R$0</div></div>
+      <div class="metric"><div class="metric-label">Ticket médio</div><div class="metric-value" id="m-ticket">R$0</div></div>
+    </div>
+    <div class="card">
+      <div class="section-title">Por forma de pagamento</div>
+      <div id="pay-breakdown"><div class="empty">Sem dados ainda.</div></div>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <div class="section-title">Produtos mais vendidos</div>
+      <div id="prod-breakdown"><div class="empty">Sem dados ainda.</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const PRODUTOS = [
+  'Luva de látex P','Luva de látex M','Luva de látex G',
+  'Luva de nitrilo P','Luva de nitrilo M','Luva de nitrilo G',
+  'Máscara descartável','Touca descartável',
+  'Material odontológico','Outro'
+];
+
+let vendas = JSON.parse(localStorage.getItem('vendas') || '[]');
+const scriptURL = 'https://script.google.com/macros/s/AKfycbweIvB7dPgtxNX9FoU3yZOO96LWKpsNjuO3W96bb2Mr2pD8MmKY0G7eKodaDSfcZkpO/exec';
+
+document.getElementById('setup-banner').className = 'setup-banner connected';
+document.getElementById('setup-banner').innerHTML = `<strong>✅ Conectado ao Google Sheets</strong> Vendas sendo enviadas em tempo real para a planilha.`;
+
+function prodOptions(selected) {
+  return PRODUTOS.map(p => `<option ${p===selected?'selected':''} value="${p}">${p}</option>`).join('');
+}
+
+function addLine(nome='', qtd=1, preco='') {
+  const list = document.getElementById('products-list');
+  const div = document.createElement('div');
+  div.className = 'grid3';
+  div.innerHTML = `
+    <div class="field"><label>Produto</label>
+      <select class="prod-nome"><option value="">Selecione</option>${prodOptions(nome)}</select></div>
+    <div class="field"><label>Qtd</label>
+      <input type="number" class="prod-qtd" min="1" value="${qtd}" /></div>
+    <div class="field"><label>Valor unit.</label>
+      <input type="number" class="prod-preco" min="0" step="0.01" placeholder="0,00" value="${preco}" /></div>
+    <button class="remove-btn" onclick="removeLine(this)" title="Remover">×</button>`;
+  list.appendChild(div);
+  div.querySelectorAll('.prod-qtd,.prod-preco').forEach(el => el.addEventListener('input', calcTotal));
+}
+
+function removeLine(btn) {
+  const lines = document.querySelectorAll('.grid3');
+  if (lines.length > 1) { btn.closest('.grid3').remove(); calcTotal(); }
+}
+
+function calcTotal() {
+  let total = 0;
+  document.querySelectorAll('.grid3').forEach(line => {
+    const q = parseFloat(line.querySelector('.prod-qtd').value) || 0;
+    const p = parseFloat(line.querySelector('.prod-preco').value) || 0;
+    total += q * p;
+  });
+  document.getElementById('total-display').textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
+  return total;
+}
+
+async function registrarVenda() {
+  const cliente = document.getElementById('cliente').value.trim();
+  const pagamento = document.getElementById('pagamento').value;
+  if (!cliente) { showToast('Informe o nome do cliente.', true); return; }
+  if (!pagamento) { showToast('Selecione a forma de pagamento.', true); return; }
+
+  const produtos = [];
+  let total = 0, ok = true;
+  document.querySelectorAll('.grid3').forEach(line => {
+    const nome = line.querySelector('.prod-nome').value;
+    const qtd = parseFloat(line.querySelector('.prod-qtd').value) || 0;
+    const preco = parseFloat(line.querySelector('.prod-preco').value) || 0;
+    if (!nome || qtd <= 0 || preco <= 0) { ok = false; return; }
+    produtos.push({ nome, qtd, preco });
+    total += qtd * preco;
+  });
+  if (!ok || produtos.length === 0) { showToast('Preencha todos os produtos corretamente.', true); return; }
+
+  const obs = document.getElementById('obs').value.trim();
+  const id = 'V' + Date.now();
+  const now = new Date().toLocaleString('pt-BR');
+  const venda = { id, data: now, cliente, pagamento, produtos, total, obs };
+
+  vendas.push(venda);
+  localStorage.setItem('vendas', JSON.stringify(vendas));
+
+  const btn = document.getElementById('submit-btn');
+  const status = document.getElementById('sync-status');
+
+  if (scriptURL) {
+    btn.disabled = true;
+    btn.textContent = 'Enviando...';
+    status.textContent = '';
+    try {
+      const prodStr = produtos.map(p => `${p.qtd}x ${p.nome} (R$${p.preco.toFixed(2)})`).join(' | ');
+      await fetch(scriptURL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, data: now, cliente, pagamento, produtos: prodStr, total: total.toFixed(2), obs })
+      });
+      status.textContent = '✅ Salvo no Google Sheets';
+      status.className = 'sync-status ok';
+    } catch(e) {
+      status.textContent = '⚠️ Erro ao enviar — venda salva localmente';
+      status.className = 'sync-status err';
+    }
+    btn.disabled = false;
+    btn.textContent = 'Registrar venda';
+  } else {
+    status.textContent = '💾 Salvo localmente (conecte o Sheets para sincronizar)';
+    status.className = 'sync-status';
+  }
+
+  showToast('Venda registrada com sucesso!');
+  document.getElementById('cliente').value = '';
+  document.getElementById('pagamento').value = '';
+  document.getElementById('obs').value = '';
+  document.getElementById('products-list').innerHTML = '';
+  addLine();
+  calcTotal();
+}
+
+function showToast(msg, err=false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (err ? ' error' : '');
+  setTimeout(() => t.className = 'toast', 2800);
+}
+
+function switchTab(name) {
+  var names = ['registrar','historico','resumo'];
+  var tabs = document.querySelectorAll('.tab');
+  for (var i = 0; i < tabs.length; i++) {
+    if (names[i] === name) {
+      tabs[i].className = 'tab active';
+    } else {
+      tabs[i].className = 'tab';
+    }
+  }
+  var panes = document.querySelectorAll('.pane');
+  for (var j = 0; j < panes.length; j++) {
+    panes[j].className = 'pane';
+  }
+  document.getElementById('pane-' + name).className = 'pane active';
+  if (name === 'historico') updateHistorico();
+  if (name === 'resumo') updateResumo();
+}
+
+function payLabel(p) { return {pix:'Pix',dinheiro:'Dinheiro',cartao:'Cartão',fiado:'Fiado'}[p]||p; }
+
+function updateHistorico() {
+  const el = document.getElementById('historico-list');
+  if (!vendas.length) { el.innerHTML = '<div class="empty">Nenhuma venda registrada ainda.</div>'; return; }
+  el.innerHTML = vendas.slice().reverse().map(v => `
+    <div class="sale-item">
+      <div>
+        <div class="sale-client">${v.cliente}</div>
+        <div class="sale-meta">${v.produtos.map(p=>p.qtd+'× '+p.nome).join(' · ')}</div>
+        <div class="sale-meta">${v.data}</div>
+      </div>
+      <div class="sale-right">
+        <div class="sale-total">R$ ${v.total.toFixed(2).replace('.',',')}</div>
+        <span class="badge ${v.pagamento}">${payLabel(v.pagamento)}</span>
+      </div>
+    </div>`).join('');
+}
+
+function updateResumo() {
+  const total = vendas.reduce((s,v)=>s+v.total,0);
+  const count = vendas.length;
+  document.getElementById('m-count').textContent = count;
+  document.getElementById('m-total').textContent = 'R$'+Math.round(total);
+  document.getElementById('m-ticket').textContent = count ? 'R$'+Math.round(total/count) : 'R$0';
+
+  const byPay = {};
+  vendas.forEach(v => { byPay[v.pagamento] = (byPay[v.pagamento]||0)+v.total; });
+  const payEl = document.getElementById('pay-breakdown');
+  if (!Object.keys(byPay).length) { payEl.innerHTML = '<div class="empty">Sem dados.</div>'; }
+  else payEl.innerHTML = Object.entries(byPay).map(([k,v])=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #f0f0f0;font-size:14px">
+      <span class="badge ${k}">${payLabel(k)}</span>
+      <span style="font-weight:600">R$ ${v.toFixed(2).replace('.',',')}</span>
+    </div>`).join('');
+
+  const byProd = {};
+  vendas.forEach(v => v.produtos.forEach(p => { byProd[p.nome]=(byProd[p.nome]||0)+p.qtd; }));
+  const prodEl = document.getElementById('prod-breakdown');
+  if (!Object.keys(byProd).length) { prodEl.innerHTML = '<div class="empty">Sem dados.</div>'; }
+  else {
+    const sorted = Object.entries(byProd).sort((a,b)=>b[1]-a[1]);
+    prodEl.innerHTML = sorted.map(([nome,qtd])=>`
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #f0f0f0;font-size:14px">
+        <span>${nome}</span><span style="font-weight:600;color:#6e6e73">${qtd} un.</span>
+      </div>`).join('');
+  }
+}
+
+addLine();
+</script>
+</body>
+</html>
