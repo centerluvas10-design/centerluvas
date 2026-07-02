@@ -695,6 +695,7 @@ var CFG_DEFAULT = {
 
 var cfg, produtos, pedidos, vendas, despesas, carrinho, catAtiva, pagSel, tipoEntrega, pedidoAtual, ultimaVenda;
 var prodImgs = {};
+var pedidosList = [];
 var imgTargetIdx = -1;
 var npPendingImg = null;
 
@@ -1397,28 +1398,41 @@ var PAY_LABEL={pix:'Pix',dinheiro:'Dinheiro',cartao:'Cartão',fiado:'Fiado'};
 
 function renderAdminPedidos(){
   var el=document.getElementById('admin-pedidos-list'); if(!el) return;
-  if(!pedidos.length){ el.innerHTML='<div class="empty">Nenhum pedido ainda.</div>'; return; }
-  el.innerHTML=pedidos.slice().reverse().map(function(p){
+  el.innerHTML='<div class="empty">Carregando pedidos...</div>';
+  fetch(SCRIPT_URL+'?type=pedidos&admin_pass='+encodeURIComponent(cfg.adminPass),{redirect:'follow'})
+    .then(function(r){ return r.json(); })
+    .then(function(lista){ pedidosList=lista||[]; renderPedidosList(); })
+    .catch(function(){ el.innerHTML='<div class="empty">Erro ao carregar pedidos.</div>'; });
+}
+
+function renderPedidosList(){
+  var el=document.getElementById('admin-pedidos-list'); if(!el) return;
+  if(!pedidosList.length){ el.innerHTML='<div class="empty">Nenhum pedido ainda.</div>'; return; }
+  el.innerHTML=pedidosList.slice().reverse().map(function(p){
     var status=p.status||'aguardando';
-    var itens=p.itens.map(function(i){ return i.qty+'× '+i.nome; }).join(', ');
+    var clienteNome=p.cliente?p.cliente.nome:(p.cliente_nome||'');
+    var clienteTel=p.cliente?p.cliente.tel:(p.telefone||'');
+    var clienteEnd=p.cliente?p.cliente.endereco:(p.endereco||'');
+    var itens=p.itens?p.itens.map(function(i){ return i.qty+'× '+i.nome; }).join(', '):(p.produtos||'');
     var badge='<span class="status-badge s-'+status+'">'+(STATUS_LABEL[status]||status)+'</span>';
+    var totalFmt=typeof p.total==='number'?p.total.toFixed(2).replace('.',','):(p.total||'0').replace('.',',');
     var acts='';
     if(status==='aguardando') acts+='<button class="oact-btn" style="border-color:var(--green);color:var(--green)" onclick="updOrd(\''+p.id+'\',\'confirmado\')">✓ Confirmar Pix</button>';
     if(status==='confirmado') acts+='<button class="oact-btn" style="border-color:var(--p);color:var(--p)" onclick="updOrd(\''+p.id+'\',\'preparando\')">📦 Preparando</button>';
     if(status==='preparando') acts+='<button class="oact-btn" style="border-color:#3498db;color:#3498db" onclick="updOrd(\''+p.id+'\',\'enviado\')">🚚 Enviado</button>';
     if(status==='enviado') acts+='<button class="oact-btn" style="border-color:var(--green);color:var(--green)" onclick="updOrd(\''+p.id+'\',\'entregue\')">✅ Entregue</button>';
     if(status!=='cancelado'&&status!=='entregue') acts+='<button class="oact-btn" style="border-color:var(--red);color:var(--red)" onclick="updOrd(\''+p.id+'\',\'cancelado\')">✕ Cancelar</button>';
-    if(cfg.whatsapp&&p.cliente&&p.cliente.tel){
-      var wm='Olá '+p.cliente.nome+'! Seu pedido '+p.id+' está: '+(STATUS_LABEL[status]||status).toLowerCase()+'.';
-      acts+='<a class="oact-btn" style="border-color:#25D366;color:#25D366;text-decoration:none" href="https://wa.me/'+p.cliente.tel.replace(/\D/g,'')+'?text='+encodeURIComponent(wm)+'" target="_blank">💬 WhatsApp</a>';
+    if(cfg.whatsapp&&clienteTel){
+      var wm='Olá '+clienteNome+'! Seu pedido '+p.id+' está: '+(STATUS_LABEL[status]||status).toLowerCase()+'.';
+      acts+='<a class="oact-btn" style="border-color:#25D366;color:#25D366;text-decoration:none" href="https://wa.me/'+clienteTel.replace(/\D/g,'')+'?text='+encodeURIComponent(wm)+'" target="_blank">💬 WhatsApp</a>';
     }
-    return '<div class="order-card"><div class="order-hd"><div><div class="order-id">'+esc(p.id)+' · '+esc(p.data)+'</div><div class="order-client">'+esc(p.cliente.nome)+'</div><div style="font-size:12px;color:var(--muted)">'+esc(p.cliente.tel)+' · '+esc(p.cliente.endereco)+'</div></div>'+badge+'</div><div style="font-size:13px;color:var(--muted);margin:5px 0">'+esc(itens)+'</div><div style="font-weight:700;color:var(--p)">R$ '+p.total.toFixed(2).replace('.',',')+' · '+(PAY_LABEL[p.pagamento]||p.pagamento)+'</div>'+(p.obs?'<div style="font-size:12px;color:var(--muted);margin-top:4px">Obs: '+esc(p.obs)+'</div>':'')+'<div class="order-actions">'+acts+'</div></div>';
+    return '<div class="order-card"><div class="order-hd"><div><div class="order-id">'+esc(p.id)+' · '+esc(p.data)+'</div><div class="order-client">'+esc(clienteNome)+'</div><div style="font-size:12px;color:var(--muted)">'+esc(clienteTel)+' · '+esc(clienteEnd)+'</div></div>'+badge+'</div><div style="font-size:13px;color:var(--muted);margin:5px 0">'+esc(itens)+'</div><div style="font-weight:700;color:var(--p)">R$ '+totalFmt+' · '+(PAY_LABEL[p.pagamento]||p.pagamento||'')+'</div>'+(p.obs?'<div style="font-size:12px;color:var(--muted);margin-top:4px">Obs: '+esc(p.obs)+'</div>':'')+'<div class="order-actions">'+acts+'</div></div>';
   }).join('');
 }
 
 function updOrd(id,status){
-  var p=pedidos.find(function(x){ return x.id===id; }); if(!p) return;
-  p.status=status; save(); renderAdminPedidos(); showToast('Status atualizado!');
+  var p=pedidosList.find(function(x){ return x.id===id; }); if(!p) return;
+  p.status=status; renderPedidosList(); showToast('Status atualizado!');
   fetch(SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({tipo:'atualizar_status',pedido_id:id,status:status})
   }).catch(function(){});
