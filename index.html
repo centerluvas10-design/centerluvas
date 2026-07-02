@@ -362,11 +362,14 @@ textarea{resize:vertical;min-height:55px;}
       <button class="close-btn" onclick="fecharCheckout()">✕</button>
     </div>
     <div class="modal-bd">
-      <div class="field">
+      <div id="ck-logado-info" style="display:none;background:var(--bg);border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:13px;color:var(--muted)">
+        🔒 Pedido como <strong id="ck-logado-nome"></strong>
+      </div>
+      <div id="ck-nome-row" class="field">
         <label>Nome completo *</label>
         <input type="text" id="ck-nome" placeholder="Seu nome" autocomplete="name" />
       </div>
-      <div class="field">
+      <div id="ck-tel-row" class="field">
         <label>WhatsApp *</label>
         <input type="tel" id="ck-tel" placeholder="(88) 99999-9999" autocomplete="tel" />
       </div>
@@ -479,6 +482,7 @@ textarea{resize:vertical;min-height:55px;}
     <div class="pane active" id="pane-estoque">
       <div class="card">
         <div class="section-title">Catálogo de Produtos</div>
+        <input type="search" id="search-estoque" placeholder="🔍 Buscar produto..." oninput="filtrarEstoqueAdmin(this.value)" style="width:100%;border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-size:14px;margin-bottom:12px;outline:none;-webkit-appearance:none;">
         <div class="prod-table-wrap">
           <table class="prod-table">
             <thead><tr><th>Produto</th><th>Preço</th><th>Estoque</th><th>Status</th><th></th></tr></thead>
@@ -524,6 +528,7 @@ textarea{resize:vertical;min-height:55px;}
     <div class="pane" id="pane-clientes">
       <div class="card">
         <div class="section-title">Clientes Cadastrados</div>
+        <input type="search" id="search-clientes" placeholder="🔍 Buscar por nome, e-mail ou telefone..." oninput="filtrarClientesAdmin(this.value)" style="width:100%;border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-size:14px;margin-bottom:12px;outline:none;-webkit-appearance:none;">
         <div id="admin-clientes-list"><div class="empty">Nenhum cliente cadastrado ainda.</div></div>
       </div>
     </div>
@@ -870,6 +875,7 @@ function fazerLogin(){
     localStorage.setItem('cl_token',data.token);
     localStorage.setItem('cl_nome',data.nome);
     localStorage.setItem('cl_email',email);
+    if(data.telefone) localStorage.setItem('cl_tel',data.telefone);
     atualizarBtnConta();
     abrirConta();
     showToast('Bem-vindo(a), '+data.nome.split(' ')[0]+'!');
@@ -908,6 +914,7 @@ function fazerLogout(){
   localStorage.removeItem('cl_token');
   localStorage.removeItem('cl_nome');
   localStorage.removeItem('cl_email');
+  localStorage.removeItem('cl_tel');
   atualizarBtnConta();
   fecharConta();
   showToast('Você saiu da conta.');
@@ -937,21 +944,35 @@ function carregarMeusPedidos(token){
 }
 
 // ── Admin clientes ──
+var clientesList=[];
+var clientesQuery='';
+
+function filtrarClientesAdmin(q){ clientesQuery=q.toLowerCase(); renderClientesFiltrados(); }
+
+function renderClientesFiltrados(){
+  var el=document.getElementById('admin-clientes-list'); if(!el) return;
+  var lista=clientesQuery
+    ?clientesList.filter(function(c){ return (c.nome+' '+c.email+' '+(c.telefone||'')).toLowerCase().indexOf(clientesQuery)!==-1; })
+    :clientesList;
+  if(!lista.length){ el.innerHTML='<div class="empty">Nenhum cliente encontrado.</div>'; return; }
+  el.innerHTML=lista.map(function(c){
+    return '<div class="cliente-card">'+
+      '<div class="cliente-nome">'+esc(c.nome)+'</div>'+
+      '<div class="cliente-info">'+esc(c.email)+(c.telefone?' · '+esc(c.telefone):'')+'</div>'+
+      '<div class="cliente-info">Cadastro: '+esc(c.criado_em||'')+'</div>'+
+      '<button class="reset-pass-btn" onclick="resetarSenha(\''+esc(c.email)+'\')">🔑 Resetar senha</button>'+
+      '</div>';
+  }).join('');
+}
+
 function renderAdminClientes(){
   var el=document.getElementById('admin-clientes-list'); if(!el) return;
   el.innerHTML='<div class="empty">Carregando...</div>';
   fetch(SCRIPT_URL+'?type=clientes&admin_pass='+encodeURIComponent(cfg.adminPass),{redirect:'follow'})
     .then(function(r){ return r.json(); })
     .then(function(lista){
-      if(!lista||!lista.length){ el.innerHTML='<div class="empty">Nenhum cliente cadastrado ainda.</div>'; return; }
-      el.innerHTML=lista.map(function(c){
-        return '<div class="cliente-card">'+
-          '<div class="cliente-nome">'+esc(c.nome)+'</div>'+
-          '<div class="cliente-info">'+esc(c.email)+(c.telefone?' · '+esc(c.telefone):'')+'</div>'+
-          '<div class="cliente-info">Cadastro: '+esc(c.criado_em||'')+'</div>'+
-          '<button class="reset-pass-btn" onclick="resetarSenha(\''+esc(c.email)+'\')">🔑 Resetar senha</button>'+
-          '</div>';
-      }).join('');
+      clientesList=lista||[];
+      renderClientesFiltrados();
     })
     .catch(function(){ el.innerHTML='<div class="empty">Erro ao carregar clientes.</div>'; });
 }
@@ -1146,7 +1167,27 @@ function renderCartItems(){
 // ── CHECKOUT ──
 function abrirCheckout(){
   if(!carrinho.length){ showToast('Adicione produtos ao carrinho.',true); return; }
+  var cl=clienteLogado();
+  if(!cl){
+    fecharCarrinho();
+    showToast('Faça login ou cadastre-se para continuar.',true);
+    abrirConta();
+    return;
+  }
   fecharCarrinho();
+  // pré-preenche e oculta campos do cliente logado
+  document.getElementById('ck-nome').value=cl.nome;
+  document.getElementById('ck-nome-row').style.display='none';
+  document.getElementById('ck-logado-info').style.display='block';
+  document.getElementById('ck-logado-nome').textContent=cl.nome;
+  var clTel=localStorage.getItem('cl_tel')||'';
+  if(clTel){
+    document.getElementById('ck-tel').value=clTel;
+    document.getElementById('ck-tel-row').style.display='none';
+  } else {
+    document.getElementById('ck-tel').value='';
+    document.getElementById('ck-tel-row').style.display='block';
+  }
   document.getElementById('ck-total-disp').textContent='R$ '+cartTotal().toFixed(2).replace('.',',');
   document.getElementById('checkout-overlay').classList.add('open');
 }
@@ -1296,9 +1337,17 @@ function switchTab(name){
 }
 
 // ── STOCK ──
+var estoqueQuery='';
+function filtrarEstoqueAdmin(q){ estoqueQuery=q.toLowerCase(); renderAdminEstoque(); }
+
 function renderAdminEstoque(){
   var tbody=document.getElementById('admin-prod-tbody'); if(!tbody) return;
-  tbody.innerHTML=produtos.map(function(p,i){
+  var lista=estoqueQuery
+    ?produtos.filter(function(p){ return (p.nome+' '+p.cat).toLowerCase().indexOf(estoqueQuery)!==-1; })
+    :produtos;
+  if(!lista.length){ tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--muted)">Nenhum produto encontrado.</td></tr>'; return; }
+  tbody.innerHTML=lista.map(function(p){
+    var i=produtos.indexOf(p);
     var thumb=prodImgs[p.id]
       ?'<img src="'+prodImgs[p.id]+'" class="prod-thumb" alt="">'
       :'<span style="font-size:26px;line-height:36px;text-align:center;width:36px;display:inline-block">'+esc(p.emoji)+'</span>';
