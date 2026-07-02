@@ -1393,7 +1393,8 @@ function saveConfig(){
   // Envia config ao Google Sheets para que clientes possam carregar
   fetch(SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({tipo:'config',pixKey:cfg.pixKey,pixName:cfg.pixName,
-      pixCity:cfg.pixCity,whatsapp:cfg.whatsapp,lojaMsg:cfg.lojaMsg,lojaAtiva:cfg.lojaAtiva})
+      pixCity:cfg.pixCity,whatsapp:cfg.whatsapp,lojaMsg:cfg.lojaMsg,lojaAtiva:cfg.lojaAtiva,
+      adminPass:cfg.adminPass})
   }).catch(function(){});
   showToast('Configurações salvas e sincronizadas!');
 }
