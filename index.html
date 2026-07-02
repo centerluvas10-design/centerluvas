@@ -862,7 +862,7 @@ function fazerLogin(){
   var senha=document.getElementById('login-senha').value||'';
   if(!email||!senha){ showToast('Preencha e-mail e senha.',true); return; }
   hashSenha(senha).then(function(hash){
-    return fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'application/json'},
+    return fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},
       body:JSON.stringify({tipo:'login',email:email,senha_hash:hash})});
   }).then(function(r){ return r.json(); })
   .then(function(data){
@@ -887,7 +887,7 @@ function fazerRegistro(){
   if(senha.length<6){ showToast('Senha deve ter ao menos 6 caracteres.',true); return; }
   if(senha!==senha2){ showToast('As senhas não coincidem.',true); return; }
   hashSenha(senha).then(function(hash){
-    return fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'application/json'},
+    return fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},
       body:JSON.stringify({tipo:'registro',nome:nome,email:email,telefone:tel,senha_hash:hash})});
   }).then(function(r){ return r.json(); })
   .then(function(data){
@@ -958,7 +958,7 @@ function renderAdminClientes(){
 
 function resetarSenha(email){
   if(!confirm('Resetar a senha de '+email+'?\nUma senha temporária será gerada.')) return;
-  fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'application/json'},
+  fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},
     body:JSON.stringify({tipo:'reset_senha',email:email,admin_pass:cfg.adminPass})
   }).then(function(r){ return r.json(); })
   .then(function(data){
