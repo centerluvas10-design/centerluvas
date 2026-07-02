@@ -632,11 +632,26 @@ function pixPayload(key,nome,cidade,valor,txid){
 function init(){
   loadData();
   setLogoSrcs();
-  if(location.search.indexOf('admin')!==-1||location.hash==='#admin'){
-    mostrarAdmin(true);
-  } else {
-    mostrarLoja();
-  }
+  fetchRemoteConfig().finally(function(){
+    if(location.search.indexOf('admin')!==-1||location.hash==='#admin'){
+      mostrarAdmin(true);
+    } else {
+      mostrarLoja();
+    }
+  });
+}
+
+function fetchRemoteConfig(){
+  return fetch(SCRIPT_URL+'?type=config',{redirect:'follow'})
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if(!data||typeof data!=='object') return;
+      ['pixKey','pixName','pixCity','whatsapp','lojaMsg','lojaAtiva'].forEach(function(k){
+        if(data[k]!==undefined&&data[k]!==null&&data[k]!=='') cfg[k]=data[k];
+      });
+      save();
+    })
+    .catch(function(){ /* offline — usa config local */ });
 }
 
 function setLogoSrcs(){
@@ -985,7 +1000,13 @@ function saveConfig(){
   });
   var ap=document.getElementById('cfg-adminPass'); if(ap&&ap.value.trim()) cfg.adminPass=ap.value.trim();
   var la=document.getElementById('cfg-lojaAtiva'); if(la) cfg.lojaAtiva=la.checked;
-  save(); showToast('Configurações salvas!');
+  save();
+  // Envia config ao Google Sheets para que clientes possam carregar
+  fetch(SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({tipo:'config',pixKey:cfg.pixKey,pixName:cfg.pixName,
+      pixCity:cfg.pixCity,whatsapp:cfg.whatsapp,lojaMsg:cfg.lojaMsg,lojaAtiva:cfg.lojaAtiva})
+  }).catch(function(){});
+  showToast('Configurações salvas e sincronizadas!');
 }
 
 // ══════════ VENDAS (painel admin) ══════════
