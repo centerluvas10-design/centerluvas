@@ -747,13 +747,13 @@ function comprimirImagem(file){
       var img=new Image();
       img.onerror=reject;
       img.onload=function(){
-        var MAX=220;
+        var MAX=100;
         var w=img.width,h=img.height;
         if(w>h){ if(w>MAX){h=Math.round(h*MAX/w);w=MAX;} } else { if(h>MAX){w=Math.round(w*MAX/h);h=MAX;} }
         var canvas=document.createElement('canvas');
         canvas.width=w; canvas.height=h;
         canvas.getContext('2d').drawImage(img,0,0,w,h);
-        resolve(canvas.toDataURL('image/jpeg',0.65));
+        resolve(canvas.toDataURL('image/jpeg',0.50));
       };
       img.src=ev.target.result;
     };
@@ -799,6 +799,12 @@ function uploadImgProd(file){
 function syncImgProd(id,dataUrl){
   fetch(SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({tipo:'produto_img',id:id,img:dataUrl})
+  }).catch(function(){});
+}
+
+function deleteImgProd(id){
+  fetch(SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({tipo:'delete_img',id:id})
   }).catch(function(){});
 }
 
@@ -1313,7 +1319,7 @@ function toggleProd(i){ produtos[i].ativo=!produtos[i].ativo; save(); syncProdut
 function removeProd(i){
   if(!confirm('Remover "'+produtos[i].nome+'"?')) return;
   var id=produtos[i].id;
-  delete prodImgs[id]; saveImgs();
+  delete prodImgs[id]; saveImgs(); deleteImgProd(id);
   produtos.splice(i,1); save(); syncProdutos(); renderAdminEstoque();
 }
 
