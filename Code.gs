@@ -1,0 +1,303 @@
+// ══════════ Center Luvas — Google Apps Script Backend ══════════
+// Deploy as: Web App → Execute as Me → Anyone (anonymous)
+// After each edit, deploy a NEW version (do NOT reuse the old deployment URL).
+
+function doGet(e) {
+  var params = e.parameter;
+  var type   = params.type || '';
+  var props  = PropertiesService.getScriptProperties();
+
+  // ── Public config (adminPass is never returned here) ──
+  if (type === 'config') {
+    var raw = props.getProperty('cl_cfg');
+    var cfg = raw ? JSON.parse(raw) : {};
+    return jsonOut(JSON.stringify({
+      pixKey:    cfg.pixKey    || '',
+      pixName:   cfg.pixName   || '',
+      pixCity:   cfg.pixCity   || '',
+      whatsapp:  cfg.whatsapp  || '',
+      lojaMsg:   cfg.lojaMsg   || '',
+      lojaAtiva: cfg.lojaAtiva !== false
+    }));
+  }
+
+  // ── Products ──
+  if (type === 'produtos') {
+    return jsonOut(props.getProperty('cl_produtos') || '[]');
+  }
+
+  // ── Product images ──
+  if (type === 'prod_imgs') {
+    return jsonOut(props.getProperty('cl_imgs') || '{}');
+  }
+
+  // ── All orders (admin only) ──
+  if (type === 'pedidos') {
+    var adminPass = params.admin_pass || '';
+    if (!checkAdminPass(adminPass, props)) return jsonOut(JSON.stringify({erro:'senha incorreta'}));
+    var ss    = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('CL_Pedidos');
+    if (!sheet) return jsonOut('[]');
+    var rows  = sheet.getDataRange().getValues();
+    var lista = [];
+    for (var i = 0; i < rows.length; i++) {
+      if (!rows[i][0] || rows[i][0] === 'id') continue;
+      lista.push({
+        id:            String(rows[i][0]),
+        data:          String(rows[i][1]),
+        cliente_nome:  String(rows[i][2]),
+        telefone:      String(rows[i][3]),
+        endereco:      String(rows[i][4]),
+        produtos:      String(rows[i][5]),
+        total:         rows[i][6],
+        pagamento:     String(rows[i][7]),
+        obs:           String(rows[i][8]),
+        cliente_email: String(rows[i][9]),
+        status:        String(rows[i][10] || 'aguardando')
+      });
+    }
+    return jsonOut(JSON.stringify(lista));
+  }
+
+  // ── Client's own orders ──
+  if (type === 'meus_pedidos') {
+    var token = params.token || '';
+    if (!token) return jsonOut('[]');
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var clientEmail = '';
+    var cSheet = ss.getSheetByName('CL_Clientes');
+    if (cSheet) {
+      var cRows = cSheet.getDataRange().getValues();
+      for (var j = 0; j < cRows.length; j++) {
+        if (String(cRows[j][6]) === token) { clientEmail = String(cRows[j][2]); break; }
+      }
+    }
+    if (!clientEmail) return jsonOut('[]');
+    var pSheet = ss.getSheetByName('CL_Pedidos');
+    if (!pSheet) return jsonOut('[]');
+    var pRows = pSheet.getDataRange().getValues();
+    var meus  = [];
+    for (var k = 0; k < pRows.length; k++) {
+      if (!pRows[k][0] || pRows[k][0] === 'id') continue;
+      if (String(pRows[k][9]).toLowerCase() === clientEmail.toLowerCase()) {
+        meus.push({
+          id:        String(pRows[k][0]),
+          pedido_id: String(pRows[k][0]),
+          data:      String(pRows[k][1]),
+          produtos:  String(pRows[k][5]),
+          total:     pRows[k][6],
+          pagamento: String(pRows[k][7]),
+          status:    String(pRows[k][10] || 'aguardando')
+        });
+      }
+    }
+    return jsonOut(JSON.stringify(meus));
+  }
+
+  // ── Clients list (admin only) ──
+  if (type === 'clientes') {
+    var adminPass = params.admin_pass || '';
+    if (!checkAdminPass(adminPass, props)) return jsonOut(JSON.stringify({erro:'senha incorreta'}));
+    var ss    = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('CL_Clientes');
+    if (!sheet) return jsonOut('[]');
+    var rows  = sheet.getDataRange().getValues();
+    var lista = [];
+    for (var i = 0; i < rows.length; i++) {
+      if (!rows[i][0] || rows[i][2] === 'email') continue; // skip empty rows and header
+      lista.push({
+        id:        String(rows[i][0]),
+        nome:      String(rows[i][1]),
+        email:     String(rows[i][2]),
+        telefone:  String(rows[i][3]),
+        criado_em: String(rows[i][5])
+      });
+    }
+    return jsonOut(JSON.stringify(lista));
+  }
+
+  return jsonOut('{}');
+}
+
+function doPost(e) {
+  var props = PropertiesService.getScriptProperties();
+  var data;
+  try { data = JSON.parse(e.postData.contents); }
+  catch (ex) { return jsonOut(JSON.stringify({erro:'json invalido'})); }
+
+  var tipo = data.tipo || '';
+
+  // ── Save config ──
+  if (tipo === 'config') {
+    var oldRaw = props.getProperty('cl_cfg');
+    var old    = oldRaw ? JSON.parse(oldRaw) : {};
+    var newCfg = {
+      pixKey:    data.pixKey    !== undefined ? data.pixKey    : (old.pixKey    || ''),
+      pixName:   data.pixName   !== undefined ? data.pixName   : (old.pixName   || ''),
+      pixCity:   data.pixCity   !== undefined ? data.pixCity   : (old.pixCity   || ''),
+      whatsapp:  data.whatsapp  !== undefined ? data.whatsapp  : (old.whatsapp  || ''),
+      lojaMsg:   data.lojaMsg   !== undefined ? data.lojaMsg   : (old.lojaMsg   || ''),
+      lojaAtiva: data.lojaAtiva !== undefined ? data.lojaAtiva : (old.lojaAtiva !== false),
+      adminPass: data.adminPass || old.adminPass || '1234'
+    };
+    props.setProperty('cl_cfg', JSON.stringify(newCfg));
+    return jsonOut(JSON.stringify({ok:true}));
+  }
+
+  // ── Save products ──
+  if (tipo === 'produtos') {
+    var prodStr = data.produtos; // already a JSON string (double-encoded by frontend)
+    try { JSON.parse(prodStr); } catch(ex) { return jsonOut(JSON.stringify({erro:'produtos json invalido'})); }
+    props.setProperty('cl_produtos', prodStr);
+    return jsonOut(JSON.stringify({ok:true}));
+  }
+
+  // ── Save product image ──
+  if (tipo === 'produto_img') {
+    var imgs = JSON.parse(props.getProperty('cl_imgs') || '{}');
+    imgs[data.id] = data.img;
+    props.setProperty('cl_imgs', JSON.stringify(imgs));
+    return jsonOut(JSON.stringify({ok:true}));
+  }
+
+  // ── Delete product image ──
+  if (tipo === 'delete_img') {
+    var imgs = JSON.parse(props.getProperty('cl_imgs') || '{}');
+    delete imgs[data.id];
+    props.setProperty('cl_imgs', JSON.stringify(imgs));
+    return jsonOut(JSON.stringify({ok:true}));
+  }
+
+  // ── Register new client account ──
+  if (tipo === 'registro') {
+    var email     = (data.email || '').toLowerCase().trim();
+    var nome      = data.nome || '';
+    var telefone  = data.telefone || '';
+    var senhaHash = data.senha_hash || '';
+    if (!email || !nome || !senhaHash) return jsonOut(JSON.stringify({erro:'dados incompletos'}));
+    var ss    = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('CL_Clientes');
+    if (!sheet) {
+      sheet = ss.insertSheet('CL_Clientes');
+      sheet.appendRow(['id','nome','email','telefone','senha_hash','criado_em','token']);
+    }
+    var rows = sheet.getDataRange().getValues();
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][2]).toLowerCase() === email) return jsonOut(JSON.stringify({erro:'e-mail já cadastrado'}));
+    }
+    var id    = 'cli_' + Date.now();
+    var token = Utilities.getUuid();
+    sheet.appendRow([id, nome, email, telefone, senhaHash, new Date().toISOString(), token]);
+    return jsonOut(JSON.stringify({ok:true, token:token, nome:nome}));
+  }
+
+  // ── Client login ──
+  if (tipo === 'login') {
+    var email     = (data.email || '').toLowerCase().trim();
+    var senhaHash = data.senha_hash || '';
+    if (!email || !senhaHash) return jsonOut(JSON.stringify({erro:'dados incompletos'}));
+    var ss    = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('CL_Clientes');
+    if (!sheet) return jsonOut(JSON.stringify({erro:'usuário não encontrado'}));
+    var rows = sheet.getDataRange().getValues();
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][2]).toLowerCase() === email) {
+        if (String(rows[i][4]) === senhaHash) {
+          var token = Utilities.getUuid();
+          sheet.getRange(i + 1, 7).setValue(token);
+          return jsonOut(JSON.stringify({ok:true, token:token, nome:String(rows[i][1])}));
+        }
+        return jsonOut(JSON.stringify({erro:'senha incorreta'}));
+      }
+    }
+    return jsonOut(JSON.stringify({erro:'usuário não encontrado'}));
+  }
+
+  // ── New store order ──
+  if (tipo === 'pedido') {
+    var ss    = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('CL_Pedidos');
+    if (!sheet) {
+      sheet = ss.insertSheet('CL_Pedidos');
+      sheet.appendRow(['id','data','cliente_nome','telefone','endereco','produtos','total','pagamento','obs','cliente_email','status']);
+    }
+    // Frontend sends: {tipo, id, data, cliente (string name), telefone, endereco, produtos (string), total, pagamento, obs, cliente_email}
+    sheet.appendRow([
+      data.id            || ('PED' + Date.now()),
+      data.data          || new Date().toISOString(),
+      data.cliente       || data.cliente_nome || '',
+      data.telefone      || '',
+      data.endereco      || '',
+      data.produtos      || '',
+      parseFloat(data.total) || 0,
+      data.pagamento     || '',
+      data.obs           || '',
+      data.cliente_email || '',
+      data.status        || 'aguardando'
+    ]);
+    return jsonOut(JSON.stringify({ok:true}));
+  }
+
+  // ── Update order status ──
+  if (tipo === 'atualizar_status') {
+    var pedidoId = String(data.pedido_id || '');
+    var status   = String(data.status || '');
+    var ss    = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('CL_Pedidos');
+    if (!sheet) return jsonOut(JSON.stringify({erro:'planilha não encontrada'}));
+    var rows = sheet.getDataRange().getValues();
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][0]) === pedidoId) {
+        sheet.getRange(i + 1, 11).setValue(status); // column K = status
+        return jsonOut(JSON.stringify({ok:true}));
+      }
+    }
+    return jsonOut(JSON.stringify({erro:'pedido não encontrado'}));
+  }
+
+  // ── Admin manual sale (stock already updated via syncProdutos) ──
+  if (tipo === 'registrar_venda') {
+    return jsonOut(JSON.stringify({ok:true}));
+  }
+
+  // ── Register expense ──
+  if (tipo === 'registrar_despesa') {
+    return jsonOut(JSON.stringify({ok:true}));
+  }
+
+  // ── Reset a client's password (admin action) ──
+  if (tipo === 'reset_senha') {
+    if (!checkAdminPass(data.admin_pass || '', props)) return jsonOut(JSON.stringify({erro:'senha incorreta'}));
+    var email = (data.email || '').toLowerCase().trim();
+    var ss    = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('CL_Clientes');
+    if (!sheet) return jsonOut(JSON.stringify({erro:'cliente não encontrado'}));
+    var rows = sheet.getDataRange().getValues();
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][2]).toLowerCase() === email) {
+        var tempSenha = Math.random().toString(36).substr(2, 8);
+        var digest    = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, tempSenha, Utilities.Charset.UTF_8);
+        var hexHash   = digest.map(function(b){ return ('0' + (b < 0 ? b + 256 : b).toString(16)).slice(-2); }).join('');
+        sheet.getRange(i + 1, 5).setValue(hexHash);
+        return jsonOut(JSON.stringify({ok:true, temp_senha:tempSenha}));
+      }
+    }
+    return jsonOut(JSON.stringify({erro:'cliente não encontrado'}));
+  }
+
+  return jsonOut(JSON.stringify({erro:'tipo desconhecido: ' + tipo}));
+}
+
+// ── Helpers ──
+
+function checkAdminPass(pass, props) {
+  var raw    = props.getProperty('cl_cfg');
+  var cfg    = raw ? JSON.parse(raw) : {};
+  var stored = cfg.adminPass || '1234';
+  return pass === stored;
+}
+
+function jsonOut(str) {
+  return ContentService.createTextOutput(str)
+    .setMimeType(ContentService.MimeType.TEXT);
+}

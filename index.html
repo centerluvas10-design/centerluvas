@@ -981,16 +981,27 @@ function renderClientesFiltrados(){
   }).join('');
 }
 
-function renderAdminClientes(){
+function renderAdminClientes(retry){
   var el=document.getElementById('admin-clientes-list'); if(!el) return;
   el.innerHTML='<div class="empty">Carregando...</div>';
-  fetch(SCRIPT_URL+'?type=clientes&admin_pass='+encodeURIComponent(cfg.adminPass),{redirect:'follow'})
-    .then(function(r){ return r.json(); })
-    .then(function(lista){
-      clientesList=lista||[];
+  fetch(SCRIPT_URL+'?type=clientes&admin_pass='+encodeURIComponent(cfg.adminPass||'')+'&_='+Date.now(),{redirect:'follow'})
+    .then(function(r){ return r.text(); })
+    .then(function(txt){
+      var lista;
+      try{ lista=JSON.parse(txt); }catch(e){ el.innerHTML='<div class="empty">Resposta inválida do servidor.</div>'; return; }
+      if(lista&&lista.erro){
+        if(lista.erro==='senha incorreta'&&!retry){
+          pushCfgToServer();
+          setTimeout(function(){ renderAdminClientes(true); }, 2000);
+          el.innerHTML='<div class="empty">Sincronizando configuração... aguarde.</div>';
+          return;
+        }
+        el.innerHTML='<div class="empty">Erro: '+lista.erro+'</div>'; return;
+      }
+      clientesList=Array.isArray(lista)?lista:[];
       renderClientesFiltrados();
     })
-    .catch(function(){ el.innerHTML='<div class="empty">Erro ao carregar clientes.</div>'; });
+    .catch(function(e){ el.innerHTML='<div class="empty">Erro ao carregar clientes.</div>'; console.error(e); });
 }
 
 function resetarSenha(email){
