@@ -969,7 +969,10 @@ function renderClientesFiltrados(){
     return '<div class="cliente-card">'+
       '<div class="cliente-nome">'+esc(c.nome)+'</div>'+
       '<div class="cliente-info">'+esc(c.email)+(c.telefone?' · '+esc(c.telefone):'')+'</div>'+
+ claude/center-luvas-system-sc4mb6
+
       '<div class="cliente-info">Cadastro: '+esc(c.data_cadastro||c.criado_em||'')+'</div>'+
+ main
       '<button class="reset-pass-btn" onclick="resetarSenha(\''+esc(c.email)+'\')">🔑 Resetar senha</button>'+
       '</div>';
   }).join('');
@@ -1442,6 +1445,7 @@ function renderPedidosList(){
 function updOrd(id,status){
   var p=pedidosList.find(function(x){ return x.id===id; }); if(!p) return;
   p.status=status; renderPedidosList(); showToast('Status atualizado!');
+ claude/center-luvas-system-sc4mb6
   fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},
     body:JSON.stringify({tipo:'atualizar_status',pedido_id:id,status:status})
   }).catch(function(){});
