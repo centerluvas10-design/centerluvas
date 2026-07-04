@@ -330,7 +330,10 @@ textarea{resize:vertical;min-height:55px;}
           </div>
           <button class="reset-pass-btn" onclick="fazerLogout()">Sair</button>
         </div>
-        <div style="font-size:14px;font-weight:700;color:var(--p);margin-bottom:10px">Meus Pedidos</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div style="font-size:14px;font-weight:700;color:var(--p)">Meus Pedidos</div>
+          <button class="reset-pass-btn" onclick="recarregarMeusPedidos()">Atualizar</button>
+        </div>
         <div id="meus-pedidos-list"><div class="empty">Carregando...</div></div>
       </div>
     </div>
@@ -931,17 +934,23 @@ function carregarMeusPedidos(token){
     .then(function(lista){
       if(!lista||!lista.length){ el.innerHTML='<div class="empty">Nenhum pedido encontrado.</div>'; return; }
       el.innerHTML=lista.slice().reverse().map(function(p){
-        var st=p.status||'aguardando';
+        var st=(p.status||'aguardando').trim();
+        var itens=p.itens||(p.produtos||'');
         return '<div class="my-order-card">'+
           '<div class="my-order-id">'+esc(p.pedido_id||p.id||'')+'&nbsp;·&nbsp;'+esc(p.data||'')+'</div>'+
-          '<div class="my-order-items">'+esc(p.itens||'')+'</div>'+
-          '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">'+
+          '<div class="my-order-items">'+esc(itens)+'</div>'+
+          '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">'+
           '<div class="my-order-total">R$&nbsp;'+(parseFloat(p.total)||0).toFixed(2).replace('.',',')+'</div>'+
           '<span class="status-pill sp-'+st+'">'+(STATUS_NOME_CL[st]||st)+'</span>'+
           '</div></div>';
       }).join('');
     })
     .catch(function(){ el.innerHTML='<div class="empty">Erro ao carregar. Verifique sua conexão.</div>'; });
+}
+
+function recarregarMeusPedidos(){
+  var cl=clienteLogado(); if(!cl) return;
+  carregarMeusPedidos(cl.token);
 }
 
 // ── Admin clientes ──
@@ -960,7 +969,10 @@ function renderClientesFiltrados(){
     return '<div class="cliente-card">'+
       '<div class="cliente-nome">'+esc(c.nome)+'</div>'+
       '<div class="cliente-info">'+esc(c.email)+(c.telefone?' · '+esc(c.telefone):'')+'</div>'+
-      '<div class="cliente-info">Cadastro: '+esc(c.criado_em||'')+'</div>'+
+ claude/center-luvas-system-sc4mb6
+
+      '<div class="cliente-info">Cadastro: '+esc(c.data_cadastro||c.criado_em||'')+'</div>'+
+ main
       '<button class="reset-pass-btn" onclick="resetarSenha(\''+esc(c.email)+'\')">🔑 Resetar senha</button>'+
       '</div>';
   }).join('');
@@ -1433,7 +1445,8 @@ function renderPedidosList(){
 function updOrd(id,status){
   var p=pedidosList.find(function(x){ return x.id===id; }); if(!p) return;
   p.status=status; renderPedidosList(); showToast('Status atualizado!');
-  fetch(SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},
+ claude/center-luvas-system-sc4mb6
+  fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},
     body:JSON.stringify({tipo:'atualizar_status',pedido_id:id,status:status})
   }).catch(function(){});
 }
