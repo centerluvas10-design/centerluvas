@@ -111,7 +111,9 @@ textarea{resize:vertical;min-height:55px;}
 .admin-header img{width:44px;height:44px;border-radius:8px;object-fit:cover;}
 .admin-header h1{color:#fff;font-size:17px;font-weight:700;}
 .admin-header p{color:rgba(255,255,255,.75);font-size:11px;}
-.admin-header .back-btn{margin-left:auto;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.3);color:#fff;border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer;-webkit-appearance:none;}
+.admin-header .back-btn{background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.3);color:#fff;border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer;-webkit-appearance:none;}
+.admin-header .header-actions{display:flex;gap:8px;margin-left:auto;}
+.admin-header .sair-btn{background:rgba(220,50,50,.35);border:1.5px solid rgba(255,100,100,.5);color:#fff;border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer;-webkit-appearance:none;}
 .container{max-width:640px;margin:0 auto;padding:1.25rem 1rem;}
 .tabs{display:flex;border-bottom:2px solid #e5e5ea;margin-bottom:1.25rem;overflow-x:auto;scrollbar-width:none;}
 .tabs::-webkit-scrollbar{display:none;}
@@ -466,7 +468,10 @@ textarea{resize:vertical;min-height:55px;}
       <h1>CENTER LUVAS</h1>
       <p>Painel Admin</p>
     </div>
-    <button class="back-btn" onclick="voltarLoja()">← Loja</button>
+    <div class="header-actions">
+      <button class="back-btn" onclick="voltarLoja()">← Loja</button>
+      <button class="sair-btn" onclick="sairAdmin()">🚪 Sair</button>
+    </div>
   </div>
   <div class="container">
     <div class="status-banner">✅ Conectado ao Google Sheets — dados salvos em tempo real</div>
@@ -1005,7 +1010,8 @@ function init(){
   loadData();
   setLogoSrcs();
   fetchRemoteConfig().finally(function(){
-    if(location.search.indexOf('admin')!==-1||location.hash==='#admin'){
+    var adminSessao=localStorage.getItem('admin_logged')==='1';
+    if(adminSessao||location.search.indexOf('admin')!==-1||location.hash==='#admin'){
       mostrarAdmin(true);
     } else {
       mostrarLoja();
@@ -1062,9 +1068,6 @@ function mostrarLoja(){
 }
 
 function irParaAdmin(){
-  var pass=prompt('Senha do painel:');
-  if(pass===null) return;
-  if(pass!==cfg.adminPass){ showToast('Senha incorreta.',true); return; }
   mostrarAdmin(false);
 }
 
@@ -1320,10 +1323,11 @@ function fecharSucesso(){ document.getElementById('success-overlay').classList.r
 
 // ══════════ ADMIN ══════════
 function mostrarAdmin(skipAuth){
-  if(!skipAuth){
+  if(!skipAuth && localStorage.getItem('admin_logged')!=='1'){
     var pass=prompt('Senha do painel:');
     if(pass===null) return;
     if(pass!==cfg.adminPass){ showToast('Senha incorreta.',true); return; }
+    localStorage.setItem('admin_logged','1');
   }
   document.getElementById('store-view').style.display='none';
   document.getElementById('admin-view').style.display='block';
@@ -1332,6 +1336,12 @@ function mostrarAdmin(skipAuth){
   renderAdminConfig();
   addLine();
   renderAdminClientes();
+}
+
+function sairAdmin(){
+  localStorage.removeItem('admin_logged');
+  mostrarLoja();
+  showToast('Sessão admin encerrada.');
 }
 
 var activeAdminTab='estoque';
