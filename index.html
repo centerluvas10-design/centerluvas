@@ -929,10 +929,11 @@ var STATUS_NOME_CL={aguardando:'Aguardando pgto',confirmado:'Pgto confirmado',pr
 function carregarMeusPedidos(token){
   var el=document.getElementById('meus-pedidos-list');
   el.innerHTML='<div class="empty">Carregando...</div>';
-  fetch(SCRIPT_URL+'?type=meus_pedidos&token='+encodeURIComponent(token),{redirect:'follow'})
-    .then(function(r){ return r.json(); })
-    .then(function(lista){
-      if(!lista||!lista.length){ el.innerHTML='<div class="empty">Nenhum pedido encontrado.</div>'; return; }
+  fetch(SCRIPT_URL+'?type=meus_pedidos&token='+encodeURIComponent(token)+'&_='+Date.now(),{redirect:'follow'})
+    .then(function(r){ return r.text(); })
+    .then(function(txt){
+      var lista; try{ lista=JSON.parse(txt); }catch(e){ el.innerHTML='<div class="empty">Erro ao carregar pedidos.</div>'; return; }
+      if(!Array.isArray(lista)||!lista.length){ el.innerHTML='<div class="empty">Nenhum pedido encontrado.</div>'; return; }
       el.innerHTML=lista.slice().reverse().map(function(p){
         var st=(p.status||'aguardando').trim();
         var itens=p.itens||(p.produtos||'');
@@ -969,10 +970,7 @@ function renderClientesFiltrados(){
     return '<div class="cliente-card">'+
       '<div class="cliente-nome">'+esc(c.nome)+'</div>'+
       '<div class="cliente-info">'+esc(c.email)+(c.telefone?' · '+esc(c.telefone):'')+'</div>'+
- claude/center-luvas-system-sc4mb6
-
       '<div class="cliente-info">Cadastro: '+esc(c.data_cadastro||c.criado_em||'')+'</div>'+
- main
       '<button class="reset-pass-btn" onclick="resetarSenha(\''+esc(c.email)+'\')">🔑 Resetar senha</button>'+
       '</div>';
   }).join('');
@@ -1411,7 +1409,7 @@ var PAY_LABEL={pix:'Pix',dinheiro:'Dinheiro',cartao:'Cartão',fiado:'Fiado'};
 function renderAdminPedidos(){
   var el=document.getElementById('admin-pedidos-list'); if(!el) return;
   el.innerHTML='<div class="empty">Carregando pedidos...</div>';
-  fetch(SCRIPT_URL+'?type=pedidos&admin_pass='+encodeURIComponent(cfg.adminPass||''),{redirect:'follow'})
+  fetch(SCRIPT_URL+'?type=pedidos&admin_pass='+encodeURIComponent(cfg.adminPass||'')+'&_='+Date.now(),{redirect:'follow'})
     .then(function(r){ return r.text(); })
     .then(function(txt){
       var lista;
@@ -1450,11 +1448,17 @@ function renderPedidosList(){
 
 function updOrd(id,status){
   var p=pedidosList.find(function(x){ return x.id===id; }); if(!p) return;
-  p.status=status; renderPedidosList(); showToast('Status atualizado!');
- claude/center-luvas-system-sc4mb6
+  var prev=p.status;
+  p.status=status; renderPedidosList();
   fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},
     body:JSON.stringify({tipo:'atualizar_status',pedido_id:id,status:status})
-  }).catch(function(){});
+  }).then(function(r){ return r.text(); })
+  .then(function(txt){
+    var d; try{ d=JSON.parse(txt); }catch(_){ d={}; }
+    if(d&&d.ok){ showToast('Status atualizado!'); }
+    else{ showToast('Erro ao salvar: '+(d&&d.erro?d.erro:'sem resposta'),true); p.status=prev; renderPedidosList(); }
+  })
+  .catch(function(){ showToast('Erro de conexão ao atualizar.',true); p.status=prev; renderPedidosList(); });
 }
 
 // ── CONFIG ──
