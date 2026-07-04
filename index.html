@@ -811,13 +811,13 @@ function uploadImgProd(file){
 }
 
 function syncImgProd(id,dataUrl){
-  fetch(SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},
+  fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},
     body:JSON.stringify({tipo:'produto_img',id:id,img:dataUrl})
   }).catch(function(){});
 }
 
 function deleteImgProd(id){
-  fetch(SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},
+  fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},
     body:JSON.stringify({tipo:'delete_img',id:id})
   }).catch(function(){});
 }
@@ -1054,7 +1054,12 @@ function fetchRemoteConfig(){
 function syncProdutos(){
   fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},
     body:JSON.stringify({tipo:'produtos',produtos:JSON.stringify(produtos)})
-  }).catch(function(){});
+  }).then(function(r){ return r.text(); })
+  .then(function(txt){
+    try{ var d=JSON.parse(txt); if(d&&d.ok) return; }catch(e){}
+    console.warn('syncProdutos: resposta inesperada',txt.substr(0,100));
+  })
+  .catch(function(e){ console.error('syncProdutos falhou:',e); showToast('Aviso: estoque não sincronizado com servidor.',true); });
 }
 
 function setLogoSrcs(){
@@ -1245,19 +1250,20 @@ function confirmarPedido(){
   };
 
   // decrement stock and sync to server
+  var decrementados=0;
   pedidoAtual.itens.forEach(function(item){
     var p=produtos.find(function(x){ return x.id===item.id; });
-    if(p) p.estoque=Math.max(0,p.estoque-item.qty);
+    if(p){ p.estoque=Math.max(0,p.estoque-item.qty); decrementados++; }
   });
   pedidos.push(pedidoAtual);
   save();
   syncProdutos();
 
-  // sync Google Sheets
+  // register order in Google Sheets
   var prodStr=pedidoAtual.itens.map(function(i){ return i.qty+'x '+i.nome+' (R$'+i.preco.toFixed(2)+')'; }).join(' | ');
-  fetch(SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},
+  fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},
     body:JSON.stringify({tipo:'pedido',id:id,data:now,cliente:nome,telefone:tel,endereco:end,produtos:prodStr,total:total.toFixed(2),pagamento:pagSel,obs:obs,cliente_email:cl?cl.email:''})
-  }).catch(function(){});
+  }).catch(function(e){ console.error('Erro ao registrar pedido:',e); });
 
   fecharCheckout();
   carrinho=[];
@@ -1492,7 +1498,7 @@ function saveConfig(){
   var la=document.getElementById('cfg-lojaAtiva'); if(la) cfg.lojaAtiva=la.checked;
   save();
   // Envia config ao Google Sheets para que clientes possam carregar
-  fetch(SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},
+  fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},
     body:JSON.stringify({tipo:'config',pixKey:cfg.pixKey,pixName:cfg.pixName,
       pixCity:cfg.pixCity,whatsapp:cfg.whatsapp,lojaMsg:cfg.lojaMsg,lojaAtiva:cfg.lojaAtiva,
       adminPass:cfg.adminPass})
@@ -1570,7 +1576,7 @@ function registrarVenda(){
   var btn=document.getElementById('submit-btn'); var st=document.getElementById('sync-status');
   btn.disabled=true; btn.textContent='Enviando...'; st.textContent='';
   var ps=prods2.map(function(p2){ return p2.qtd+'x '+p2.nome+' (R$'+p2.preco.toFixed(2)+')'+(p2.obs?' ['+p2.obs+']':''); }).join(' | ');
-  fetch(SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({tipo:'venda',id:id,data:now,cliente:cliente,pagamento:pagamento,produtos:ps,total:total2.toFixed(2),obs:obs2})})
+  fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({tipo:'venda',id:id,data:now,cliente:cliente,pagamento:pagamento,produtos:ps,total:total2.toFixed(2),obs:obs2})})
     .then(function(){ st.textContent='✅ Salvo no Google Sheets'; st.className='sync-status ok'; })
     .catch(function(){ st.textContent='⚠️ Sem internet — salvo localmente'; st.className='sync-status err'; })
     .finally(function(){ btn.disabled=false; btn.textContent='Registrar venda'; });
@@ -1596,7 +1602,7 @@ function registrarDespesa(){
   despesas.push(desp); save();
   var btn=document.getElementById('desp-btn'); var st=document.getElementById('desp-sync-status');
   btn.disabled=true; btn.textContent='Enviando...'; st.textContent='';
-  fetch(SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({tipo:'despesa',id:id,data:now,descricao:desc,categoria:cat,valor:valor.toFixed(2),pagamento:pag,responsavel:resp,obs:obs})})
+  fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({tipo:'despesa',id:id,data:now,descricao:desc,categoria:cat,valor:valor.toFixed(2),pagamento:pag,responsavel:resp,obs:obs})})
     .then(function(){ st.textContent='✅ Salvo no Google Sheets'; st.className='sync-status ok'; })
     .catch(function(){ st.textContent='⚠️ Sem internet — salvo localmente'; st.className='sync-status err'; })
     .finally(function(){ btn.disabled=false; btn.textContent='Registrar despesa'; });
