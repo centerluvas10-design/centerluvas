@@ -1240,13 +1240,14 @@ function confirmarPedido(){
     total:total,pagamento:pagSel,obs:obs,status:'aguardando'
   };
 
-  // decrement stock
+  // decrement stock and sync to server
   pedidoAtual.itens.forEach(function(item){
     var p=produtos.find(function(x){ return x.id===item.id; });
     if(p) p.estoque=Math.max(0,p.estoque-item.qty);
   });
   pedidos.push(pedidoAtual);
   save();
+  syncProdutos();
 
   // sync Google Sheets
   var prodStr=pedidoAtual.itens.map(function(i){ return i.qty+'x '+i.nome+' (R$'+i.preco.toFixed(2)+')'; }).join(' | ');
@@ -1500,7 +1501,9 @@ var PROD_NAMES=['Luva de látex P','Luva de látex M','Luva de látex G','Luva d
 
 function prodOpts(sel){
   var h='<option value="">Selecione</option>';
-  PROD_NAMES.forEach(function(n){ h+='<option value="'+n+'"'+(n===sel?' selected':'')+'>'+n+'</option>'; });
+  produtos.filter(function(p){ return p.ativo; }).forEach(function(p){
+    h+='<option value="'+p.id+'"'+(p.id===sel?' selected':'')+'>'+esc(p.nome)+'</option>';
+  });
   return h;
 }
 
@@ -1510,6 +1513,10 @@ function addLine(nome,qtd,preco,obs){
   var div=document.createElement('div'); div.className='prod-block';
   div.innerHTML='<div class="prod-top"><div class="field" style="margin:0"><label>Produto</label><select class="prod-nome">'+prodOpts(nome)+'</select></div><div class="field" style="margin:0"><label>Qtd</label><input type="number" class="prod-qtd" min="1" value="'+qtd+'" /></div><div class="field" style="margin:0"><label>Valor unit.</label><input type="number" class="prod-preco" min="0" step="0.01" placeholder="0,00" value="'+preco+'" /></div><button class="remove-btn" onclick="removeLine(this)">×</button></div><input class="prod-obs" type="text" placeholder="Obs. deste produto (opcional)" value="'+obs+'" />';
   list.appendChild(div);
+  div.querySelector('.prod-nome').addEventListener('change',function(){
+    var prod=produtos.find(function(x){ return x.id===this.value; },this);
+    if(prod){ div.querySelector('.prod-preco').value=prod.preco.toFixed(2); calcTotal(); }
+  });
   div.querySelectorAll('.prod-qtd,.prod-preco').forEach(function(inp){ inp.addEventListener('input',calcTotal); });
 }
 
@@ -1536,18 +1543,26 @@ function registrarVenda(){
   if(!pagamento){ showToast('Selecione a forma de pagamento.',true); return; }
   var prods2=[]; var total2=0; var ok=true;
   document.querySelectorAll('.prod-block').forEach(function(b){
-    var n=b.querySelector('.prod-nome').value;
+    var pid=b.querySelector('.prod-nome').value;
     var q=parseFloat(b.querySelector('.prod-qtd').value)||0;
     var prc=parseFloat(b.querySelector('.prod-preco').value)||0;
     var ob=b.querySelector('.prod-obs').value.trim();
-    if(!n||q<=0||prc<=0){ ok=false; return; }
-    prods2.push({nome:n,qtd:q,preco:prc,obs:ob}); total2+=q*prc;
+    if(!pid||q<=0||prc<=0){ ok=false; return; }
+    var prod=produtos.find(function(x){ return x.id===pid; });
+    var n=prod?prod.nome:pid;
+    prods2.push({id:pid,nome:n,qtd:q,preco:prc,obs:ob}); total2+=q*prc;
   });
   if(!ok||!prods2.length){ showToast('Preencha todos os produtos corretamente.',true); return; }
   var obs2=(document.getElementById('obs').value||'').trim();
   var id='V'+Date.now(); var now=new Date().toLocaleString('pt-BR');
   var venda={id:id,data:now,cliente:cliente,pagamento:pagamento,produtos:prods2,total:total2,obs:obs2};
-  vendas.push(venda); ultimaVenda=venda; save();
+  vendas.push(venda); ultimaVenda=venda;
+  // decrement stock
+  prods2.forEach(function(item){
+    var p=produtos.find(function(x){ return x.id===item.id; });
+    if(p) p.estoque=Math.max(0,p.estoque-item.qtd);
+  });
+  save(); syncProdutos(); renderAdminEstoque();
   var btn=document.getElementById('submit-btn'); var st=document.getElementById('sync-status');
   btn.disabled=true; btn.textContent='Enviando...'; st.textContent='';
   var ps=prods2.map(function(p2){ return p2.qtd+'x '+p2.nome+' (R$'+p2.preco.toFixed(2)+')'+(p2.obs?' ['+p2.obs+']':''); }).join(' | ');
