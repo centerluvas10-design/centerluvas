@@ -1036,7 +1036,21 @@ function fetchRemoteConfig(){
     .then(function(txt){
       var data; try{ data=JSON.parse(txt); }catch(e){ return; }
       if(!Array.isArray(data)||data.length===0) return;
-      produtos = data;
+      // If a sync was fired recently and hasn't been confirmed yet, keep local stock
+      // to avoid overwriting a pending decrement with stale server data.
+      var syncTs=parseInt(localStorage.getItem('cl_sync_ts')||'0');
+      var pendingSync=syncTs>0&&(Date.now()-syncTs)<60000;
+      if(pendingSync){
+        // Merge: take server data for all fields except estoque (keep local)
+        data.forEach(function(srv){
+          var local=produtos.find(function(x){ return String(x.id)===String(srv.id); });
+          if(!local){ produtos.push(srv); }
+          else{ Object.keys(srv).forEach(function(k){ if(k!=='estoque') local[k]=srv[k]; }); }
+        });
+        produtos=produtos.filter(function(loc){ return data.some(function(srv){ return String(srv.id)===String(loc.id); }); });
+      } else {
+        produtos = data;
+      }
     })
     .catch(function(){});
   var imgPromise = fetch(SCRIPT_URL+'?type=prod_imgs'+t,{redirect:'follow'})
@@ -1052,11 +1066,12 @@ function fetchRemoteConfig(){
 }
 
 function syncProdutos(){
+  localStorage.setItem('cl_sync_ts', String(Date.now()));
   fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},
     body:JSON.stringify({tipo:'produtos',produtos:JSON.stringify(produtos)})
   }).then(function(r){ return r.text(); })
   .then(function(txt){
-    try{ var d=JSON.parse(txt); if(d&&d.ok) return; }catch(e){}
+    try{ var d=JSON.parse(txt); if(d&&d.ok){ localStorage.removeItem('cl_sync_ts'); return; } }catch(e){}
     console.warn('syncProdutos: resposta inesperada',txt.substr(0,100));
   })
   .catch(function(e){ console.error('syncProdutos falhou:',e); showToast('Aviso: estoque não sincronizado com servidor.',true); });
@@ -1250,12 +1265,13 @@ function confirmarPedido(){
   };
 
   // decrement stock and sync to server
-  var decrementados=0;
   pedidoAtual.itens.forEach(function(item){
-    var p=produtos.find(function(x){ return x.id===item.id; });
-    if(p){ p.estoque=Math.max(0,p.estoque-item.qty); decrementados++; }
+    var p=produtos.find(function(x){ return String(x.id)===String(item.id); });
+    if(p) p.estoque=Math.max(0,p.estoque-item.qty);
+    else console.warn('confirmarPedido: produto não encontrado para id='+item.id+', ids disponíveis='+produtos.map(function(x){return x.id;}).join(','));
   });
   pedidos.push(pedidoAtual);
+  localStorage.setItem('cl_sync_ts', String(Date.now()));
   save();
   syncProdutos();
 
