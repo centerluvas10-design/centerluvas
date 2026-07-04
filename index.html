@@ -1026,9 +1026,12 @@ function fetchRemoteConfig(){
     .then(function(txt){
       var data; try{ data=JSON.parse(txt); }catch(e){ return; }
       if(!data||typeof data!=='object') return;
+      var serverHasCfg=false;
       ['pixKey','pixName','pixCity','whatsapp','lojaMsg','lojaAtiva','adminPass'].forEach(function(k){
-        if(data[k]!==undefined&&data[k]!==null&&data[k]!=='') cfg[k]=data[k];
+        if(data[k]!==undefined&&data[k]!==null&&data[k]!=='') { cfg[k]=data[k]; serverHasCfg=true; }
       });
+      // Fresh deployment: server has no config — push local config so passwords match
+      if(!serverHasCfg) pushCfgToServer();
     })
     .catch(function(){});
   var prodPromise = fetch(SCRIPT_URL+'?type=produtos'+t,{redirect:'follow'})
@@ -1063,6 +1066,14 @@ function fetchRemoteConfig(){
     })
     .catch(function(){});
   return Promise.all([cfgPromise, prodPromise, imgPromise]).then(function(){ save(); });
+}
+
+function pushCfgToServer(){
+  fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},
+    body:JSON.stringify({tipo:'config',pixKey:cfg.pixKey,pixName:cfg.pixName,
+      pixCity:cfg.pixCity,whatsapp:cfg.whatsapp,lojaMsg:cfg.lojaMsg,
+      lojaAtiva:cfg.lojaAtiva,adminPass:cfg.adminPass})
+  }).catch(function(){});
 }
 
 function syncProdutos(){
@@ -1443,15 +1454,24 @@ function addProduto(){
 var STATUS_LABEL={aguardando:'Aguardando pgto',confirmado:'Pgto confirmado',preparando:'Preparando',enviado:'Enviado',entregue:'Entregue',cancelado:'Cancelado'};
 var PAY_LABEL={pix:'Pix',dinheiro:'Dinheiro',cartao:'Cartão',fiado:'Fiado'};
 
-function renderAdminPedidos(){
+function renderAdminPedidos(retry){
   var el=document.getElementById('admin-pedidos-list'); if(!el) return;
   el.innerHTML='<div class="empty">Carregando pedidos...</div>';
   fetch(SCRIPT_URL+'?type=pedidos&admin_pass='+encodeURIComponent(cfg.adminPass||'')+'&_='+Date.now(),{redirect:'follow'})
     .then(function(r){ return r.text(); })
     .then(function(txt){
       var lista;
-      try{ lista=JSON.parse(txt); }catch(e){ el.innerHTML='<div class="empty">Resposta inválida do servidor. Verifique o Apps Script.</div>'; console.error('Pedidos parse error:',txt.substr(0,200)); return; }
-      if(lista&&lista.erro){ el.innerHTML='<div class="empty">Erro: '+lista.erro+'</div>'; return; }
+      try{ lista=JSON.parse(txt); }catch(e){ el.innerHTML='<div class="empty">Resposta inválida do servidor.</div>'; console.error('Pedidos parse error:',txt.substr(0,200)); return; }
+      if(lista&&lista.erro){
+        if(lista.erro==='senha incorreta'&&!retry){
+          // Server has no config yet (fresh deploy) — push config and retry once
+          pushCfgToServer();
+          setTimeout(function(){ renderAdminPedidos(true); }, 2000);
+          el.innerHTML='<div class="empty">Sincronizando configuração... aguarde.</div>';
+          return;
+        }
+        el.innerHTML='<div class="empty">Erro: '+lista.erro+'</div>'; return;
+      }
       pedidosList=Array.isArray(lista)?lista:[];
       renderPedidosList();
     })
