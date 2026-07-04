@@ -1024,7 +1024,7 @@ function fetchRemoteConfig(){
     .then(function(r){ return r.json(); })
     .then(function(data){
       if(!data||typeof data!=='object') return;
-      ['pixKey','pixName','pixCity','whatsapp','lojaMsg','lojaAtiva'].forEach(function(k){
+      ['pixKey','pixName','pixCity','whatsapp','lojaMsg','lojaAtiva','adminPass'].forEach(function(k){
         if(data[k]!==undefined&&data[k]!==null&&data[k]!=='') cfg[k]=data[k];
       });
     })
