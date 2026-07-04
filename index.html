@@ -1020,25 +1020,29 @@ function init(){
 }
 
 function fetchRemoteConfig(){
-  var cfgPromise = fetch(SCRIPT_URL+'?type=config',{redirect:'follow'})
-    .then(function(r){ return r.json(); })
-    .then(function(data){
+  var t='&_='+Date.now();
+  var cfgPromise = fetch(SCRIPT_URL+'?type=config'+t,{redirect:'follow'})
+    .then(function(r){ return r.text(); })
+    .then(function(txt){
+      var data; try{ data=JSON.parse(txt); }catch(e){ return; }
       if(!data||typeof data!=='object') return;
       ['pixKey','pixName','pixCity','whatsapp','lojaMsg','lojaAtiva','adminPass'].forEach(function(k){
         if(data[k]!==undefined&&data[k]!==null&&data[k]!=='') cfg[k]=data[k];
       });
     })
     .catch(function(){});
-  var prodPromise = fetch(SCRIPT_URL+'?type=produtos',{redirect:'follow'})
-    .then(function(r){ return r.json(); })
-    .then(function(data){
+  var prodPromise = fetch(SCRIPT_URL+'?type=produtos'+t,{redirect:'follow'})
+    .then(function(r){ return r.text(); })
+    .then(function(txt){
+      var data; try{ data=JSON.parse(txt); }catch(e){ return; }
       if(!Array.isArray(data)||data.length===0) return;
       produtos = data;
     })
     .catch(function(){});
-  var imgPromise = fetch(SCRIPT_URL+'?type=prod_imgs',{redirect:'follow'})
-    .then(function(r){ return r.json(); })
-    .then(function(data){
+  var imgPromise = fetch(SCRIPT_URL+'?type=prod_imgs'+t,{redirect:'follow'})
+    .then(function(r){ return r.text(); })
+    .then(function(txt){
+      var data; try{ data=JSON.parse(txt); }catch(e){ return; }
       if(!data||typeof data!=='object') return;
       Object.keys(data).forEach(function(k){ if(data[k]) prodImgs[k]=data[k]; });
       saveImgs();
@@ -1048,7 +1052,7 @@ function fetchRemoteConfig(){
 }
 
 function syncProdutos(){
-  fetch(SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},
+  fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},
     body:JSON.stringify({tipo:'produtos',produtos:JSON.stringify(produtos)})
   }).catch(function(){});
 }
