@@ -1411,10 +1411,16 @@ var PAY_LABEL={pix:'Pix',dinheiro:'Dinheiro',cartao:'Cartão',fiado:'Fiado'};
 function renderAdminPedidos(){
   var el=document.getElementById('admin-pedidos-list'); if(!el) return;
   el.innerHTML='<div class="empty">Carregando pedidos...</div>';
-  fetch(SCRIPT_URL+'?type=pedidos&admin_pass='+encodeURIComponent(cfg.adminPass),{redirect:'follow'})
-    .then(function(r){ return r.json(); })
-    .then(function(lista){ pedidosList=lista||[]; renderPedidosList(); })
-    .catch(function(){ el.innerHTML='<div class="empty">Erro ao carregar pedidos.</div>'; });
+  fetch(SCRIPT_URL+'?type=pedidos&admin_pass='+encodeURIComponent(cfg.adminPass||''),{redirect:'follow'})
+    .then(function(r){ return r.text(); })
+    .then(function(txt){
+      var lista;
+      try{ lista=JSON.parse(txt); }catch(e){ el.innerHTML='<div class="empty">Resposta inválida do servidor. Verifique o Apps Script.</div>'; console.error('Pedidos parse error:',txt.substr(0,200)); return; }
+      if(lista&&lista.erro){ el.innerHTML='<div class="empty">Erro: '+lista.erro+'</div>'; return; }
+      pedidosList=Array.isArray(lista)?lista:[];
+      renderPedidosList();
+    })
+    .catch(function(e){ el.innerHTML='<div class="empty">Erro de rede ao carregar pedidos.</div>'; console.error(e); });
 }
 
 function renderPedidosList(){
