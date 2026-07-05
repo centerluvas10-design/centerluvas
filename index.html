@@ -291,6 +291,9 @@ textarea{resize:vertical;min-height:55px;}
     </div>
   </div>
   <div class="store-banner" id="store-banner" style="display:none"></div>
+  <div style="padding:10px 16px 0;background:#fff;border-bottom:1px solid #f0f0f0">
+    <input type="search" id="search-loja" placeholder="🔍 Buscar produto..." oninput="filtrarLoja(this.value)" style="width:100%;box-sizing:border-box;border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-size:14px;outline:none;-webkit-appearance:none;background:#fff;">
+  </div>
   <div class="cat-bar" id="cat-bar"></div>
   <div class="prod-grid" id="prod-grid"></div>
   <div class="store-footer">
@@ -1213,9 +1216,14 @@ function renderLoja(){
   if(dl){ dl.innerHTML=cats.filter(function(c){return c!=='Todos';}).map(function(c){ return '<option value="'+esc(c)+'">'; }).join(''); }
 
   // products
-  var fil=produtos.filter(function(p){ return p.ativo&&(catAtiva==='Todos'||p.cat===catAtiva); });
+  var fil=produtos.filter(function(p){
+    if(!p.ativo) return false;
+    if(!lojaQuery&&catAtiva!=='Todos'&&p.cat!==catAtiva) return false;
+    if(lojaQuery&&norm(p.nome+' '+p.cat).indexOf(lojaQuery)===-1) return false;
+    return true;
+  });
   if(!fil.length){
-    document.getElementById('prod-grid').innerHTML='<div style="text-align:center;padding:40px;color:var(--muted)">Nenhum produto nessa categoria.</div>';
+    document.getElementById('prod-grid').innerHTML='<div style="text-align:center;padding:40px;color:var(--muted)">Nenhum produto encontrado.</div>';
     return;
   }
   document.getElementById('prod-grid').innerHTML=fil.map(function(p){
@@ -1242,6 +1250,8 @@ function renderLoja(){
 function filtrar(cat){
   catAtiva=cat; renderLoja();
 }
+var lojaQuery='';
+function filtrarLoja(q){ lojaQuery=norm(q); renderLoja(); }
 
 function esc(s){
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
