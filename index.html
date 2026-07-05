@@ -1498,13 +1498,14 @@ function switchTab(name){
 }
 
 // ── STOCK ──
+function norm(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }
 var estoqueQuery='';
-function filtrarEstoqueAdmin(q){ estoqueQuery=q.toLowerCase(); renderAdminEstoque(); }
+function filtrarEstoqueAdmin(q){ estoqueQuery=norm(q); renderAdminEstoque(); }
 
 function renderAdminEstoque(){
   var tbody=document.getElementById('admin-prod-tbody'); if(!tbody) return;
   var lista=estoqueQuery
-    ?produtos.filter(function(p){ return (p.nome+' '+p.cat).toLowerCase().indexOf(estoqueQuery)!==-1; })
+    ?produtos.filter(function(p){ return norm(p.nome+' '+p.cat).indexOf(estoqueQuery)!==-1; })
     :produtos;
   if(!lista.length){ tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--muted)">Nenhum produto encontrado.</td></tr>'; return; }
   tbody.innerHTML=lista.map(function(p){
