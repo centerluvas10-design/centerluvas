@@ -127,11 +127,46 @@ function doPost(e) {
 
   var tipo = data.tipo || '';
 
-  // ── Admin login verification (always checked against server, never local default) ──
+  // ── Admin login verification (server-side; tracks failures and emails password after 3 wrong attempts) ──
   if (tipo === 'admin_login') {
     var pass = data.password || '';
-    if (!checkAdminPass(pass, props)) return jsonOut(JSON.stringify({erro:'senha incorreta'}));
-    return jsonOut(JSON.stringify({ok:true}));
+
+    // Load failure counter (reset automatically after 1 hour)
+    var failsRaw = props.getProperty('cl_login_fails');
+    var fails    = failsRaw ? JSON.parse(failsRaw) : {count:0, ts:0};
+    if (Date.now() - fails.ts > 3600000) fails = {count:0, ts:0};
+
+    if (checkAdminPass(pass, props)) {
+      props.deleteProperty('cl_login_fails');
+      return jsonOut(JSON.stringify({ok:true}));
+    }
+
+    // Wrong password
+    fails.count += 1;
+    fails.ts = Date.now();
+    props.setProperty('cl_login_fails', JSON.stringify(fails));
+
+    if (fails.count >= 3) {
+      props.deleteProperty('cl_login_fails'); // reset so next cycle starts fresh
+      var cfgRaw   = props.getProperty('cl_cfg');
+      var adminCfg = cfgRaw ? JSON.parse(cfgRaw) : {};
+      var adminPass = adminCfg.adminPass || '1234';
+      var emailSent = false;
+      try {
+        MailApp.sendEmail({
+          to:      'centerluvas10@gmail.com',
+          subject: 'Center Luvas — Recuperação de senha do painel admin',
+          body:    'Olá!\n\nApós 3 tentativas incorretas de login no painel administrativo, sua senha atual foi recuperada automaticamente:\n\n'
+                 + '🔑 Senha: ' + adminPass + '\n\n'
+                 + 'Acesse o painel e altere a senha nas Configurações se necessário.\n\n'
+                 + '— Center Luvas'
+        });
+        emailSent = true;
+      } catch(ex) { /* MailApp may require re-authorization on first use */ }
+      return jsonOut(JSON.stringify({erro:'senha incorreta', email_enviado:emailSent}));
+    }
+
+    return jsonOut(JSON.stringify({erro:'senha incorreta', tentativas_restantes: 3 - fails.count}));
   }
 
   // ── Save config ──
