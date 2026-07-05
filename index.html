@@ -103,8 +103,12 @@ textarea{resize:vertical;min-height:55px;}
 .success-sub{font-size:14px;color:var(--muted);text-align:center;margin-bottom:16px;}
 
 /* ── STORE FOOTER ── */
-.store-footer{text-align:center;padding:24px 0 36px;color:#aaa;font-size:11px;}
+.store-footer{text-align:center;padding:24px 0 80px;color:#aaa;font-size:11px;}
 .admin-link{color:#d1d1d6;font-size:11px;background:none;border:none;cursor:pointer;padding:4px;-webkit-appearance:none;}
+
+/* ── WHATSAPP FLOAT ── */
+.wpp-float{position:fixed;bottom:20px;right:16px;z-index:200;display:flex;align-items:center;gap:9px;background:#25D366;color:#fff;border-radius:50px;padding:13px 20px;font-size:14px;font-weight:700;text-decoration:none;box-shadow:0 4px 18px rgba(37,211,102,.45);transition:transform .15s,box-shadow .15s;white-space:nowrap;}
+.wpp-float:active{transform:scale(.95);box-shadow:0 2px 10px rgba(37,211,102,.35);}
 
 /* ── ADMIN ── */
 .admin-header{background:var(--p);padding:14px 1rem;display:flex;align-items:center;gap:12px;}
@@ -293,6 +297,10 @@ textarea{resize:vertical;min-height:55px;}
     Center Luvas · Cariri<br>
     <button class="admin-link" onclick="irParaAdmin()">Sistema</button>
   </div>
+  <a class="wpp-float" href="https://wa.me/message/AG5W7TG534FSI1" target="_blank" rel="noopener">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.38 1.26 4.78L2 22l5.45-1.43c1.35.73 2.89 1.15 4.54 1.15h.01c5.46 0 9.91-4.45 9.91-9.91C21.91 6.45 17.5 2 12.04 2zm5.48 13.68c-.25.7-1.23 1.28-1.71 1.36-.44.08-.99.11-1.6-.1-.37-.12-.84-.29-1.44-.56-2.53-1.09-4.18-3.62-4.31-3.79-.13-.17-1.05-1.4-1.05-2.67s.66-1.9.9-2.15c.24-.26.52-.32.69-.32.17 0 .35.01.5.01.16.01.38-.06.59.45.22.52.74 1.8.81 1.93.07.13.11.28.02.45-.09.17-.14.27-.27.42-.13.15-.28.33-.4.44-.13.12-.27.25-.12.49.15.24.67 1.1 1.43 1.78.98.87 1.81 1.14 2.07 1.27.26.13.41.11.56-.07.15-.18.64-.75.81-1.01.17-.26.35-.21.59-.13.24.09 1.53.72 1.79.85.26.13.43.19.49.3.07.11.07.64-.18 1.34z"/></svg>
+    Entrar em contato com a loja
+  </a>
 </div>
 
 <!-- ══════════════════════ ACCOUNT MODAL ══════════════════════ -->
