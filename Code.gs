@@ -152,18 +152,19 @@ function doPost(e) {
       var adminCfg = cfgRaw ? JSON.parse(cfgRaw) : {};
       var adminPass = adminCfg.adminPass || '1234';
       var emailSent = false;
+      var emailErro = '';
       try {
         MailApp.sendEmail({
           to:      'centerluvas10@gmail.com',
           subject: 'Center Luvas — Recuperação de senha do painel admin',
           body:    'Olá!\n\nApós 3 tentativas incorretas de login no painel administrativo, sua senha atual foi recuperada automaticamente:\n\n'
-                 + '🔑 Senha: ' + adminPass + '\n\n'
+                 + 'Senha: ' + adminPass + '\n\n'
                  + 'Acesse o painel e altere a senha nas Configurações se necessário.\n\n'
                  + '— Center Luvas'
         });
         emailSent = true;
-      } catch(ex) { /* MailApp may require re-authorization on first use */ }
-      return jsonOut(JSON.stringify({erro:'senha incorreta', email_enviado:emailSent}));
+      } catch(ex) { emailErro = String(ex.message || ex); }
+      return jsonOut(JSON.stringify({erro:'senha incorreta', email_enviado:emailSent, email_erro:emailErro}));
     }
 
     return jsonOut(JSON.stringify({erro:'senha incorreta', tentativas_restantes: 3 - fails.count}));
@@ -355,6 +356,16 @@ function doPost(e) {
 }
 
 // ── Helpers ──
+
+// ── Run this function ONCE from the Apps Script editor to authorize Gmail ──
+function testarEmail() {
+  MailApp.sendEmail({
+    to:      'centerluvas10@gmail.com',
+    subject: 'Center Luvas — Teste de e-mail',
+    body:    'E-mail de teste enviado com sucesso. O sistema de recuperação de senha está autorizado.'
+  });
+  Logger.log('E-mail enviado com sucesso.');
+}
 
 function checkAdminPass(pass, props) {
   var raw    = props.getProperty('cl_cfg');

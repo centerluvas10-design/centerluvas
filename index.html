@@ -1442,8 +1442,10 @@ function mostrarAdmin(skipAuth){
         cfg.adminPass=pass; save();
         localStorage.setItem('admin_logged','1');
         _abrirPainelAdmin();
-      } else if(d&&d.email_enviado){
-        alert('Senha incorreta.\n\nSua senha foi enviada para o e-mail do administrador.\nVerifique sua caixa de entrada.');
+      } else if(d&&d.email_enviado===true){
+        alert('Senha incorreta.\n\nSua senha foi enviada para centerluvas10@gmail.com.\nVerifique sua caixa de entrada.');
+      } else if(d&&d.email_enviado===false&&d.email_erro!==undefined){
+        alert('Senha incorreta.\n\n3 tentativas atingidas, mas o envio do e-mail falhou.\n\nCausa: '+d.email_erro+'\n\nSolução: abra o Apps Script, selecione a função "testarEmail" e clique em Executar (▶) para autorizar o Gmail.');
       } else if(d&&typeof d.tentativas_restantes==='number'){
         showToast('Senha incorreta. '+d.tentativas_restantes+' tentativa(s) restante(s).',true);
       } else {
