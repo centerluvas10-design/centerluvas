@@ -513,36 +513,15 @@ textarea{resize:vertical;min-height:55px;}
     <div class="pane active" id="pane-estoque">
       <div class="card">
         <div class="section-title">Catálogo de Produtos</div>
-        <input type="search" id="search-estoque" placeholder="🔍 Buscar produto..." oninput="filtrarEstoqueAdmin(this.value)" style="width:100%;border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-size:14px;margin-bottom:12px;outline:none;-webkit-appearance:none;">
+        <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+          <input type="search" id="search-estoque" placeholder="🔍 Buscar produto..." oninput="filtrarEstoqueAdmin(this.value)" style="flex:1;border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-size:14px;outline:none;-webkit-appearance:none;">
+          <button onclick="abrirNovoProduto()" style="flex-shrink:0;background:var(--p);color:#fff;border:none;border-radius:10px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">+ Novo produto</button>
+        </div>
         <div class="prod-table-wrap">
           <table class="prod-table">
             <thead><tr><th>Produto</th><th>Preço</th><th>Estoque</th><th>Status</th><th></th></tr></thead>
             <tbody id="admin-prod-tbody"></tbody>
           </table>
-        </div>
-      </div>
-      <div class="card">
-        <div class="section-title">Adicionar Produto</div>
-        <div class="prod-form">
-          <div class="grid2" style="margin-bottom:8px">
-            <div class="field" style="margin:0"><label>Nome *</label><input type="text" id="np-nome" placeholder="Ex: Luva de Látex P" /></div>
-            <div class="field" style="margin:0"><label>Categoria *</label><input type="text" id="np-cat" placeholder="Ex: Luvas de Látex" list="cat-list" /></div>
-          </div>
-          <datalist id="cat-list"></datalist>
-          <div class="prod-form grid3" style="margin-bottom:8px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
-            <div class="field" style="margin:0"><label>Preço (R$) *</label><input type="number" id="np-preco" step="0.01" min="0" placeholder="0,00" /></div>
-            <div class="field" style="margin:0"><label>Estoque</label><input type="number" id="np-estoque" min="0" placeholder="0" /></div>
-            <div class="field" style="margin:0"><label>Emoji</label><input type="text" id="np-emoji" placeholder="🧤" maxlength="4" /></div>
-          </div>
-          <div class="field"><label>Unidade / Descrição</label><input type="text" id="np-unidade" placeholder="Ex: caixa c/ 100 unidades" /></div>
-          <div class="field">
-            <label>Foto do produto <span style="font-weight:400;color:var(--muted)">(opcional — substitui o emoji)</span></label>
-            <label class="foto-label" for="np-foto">📷 Selecionar foto</label>
-            <input type="file" id="np-foto" accept="image/*" style="display:none" onchange="npFotoChange(this)">
-            <img id="np-preview" class="np-preview" alt="preview">
-            <button id="np-limpar-foto" style="display:none;background:none;border:none;color:var(--red);font-size:12px;cursor:pointer;margin-top:4px" onclick="npLimparFoto()">✕ Remover foto</button>
-          </div>
-          <button class="venda-submit" onclick="addProduto()" style="margin-top:4px">+ Adicionar produto</button>
         </div>
       </div>
     </div>
@@ -699,6 +678,37 @@ textarea{resize:vertical;min-height:55px;}
 
   </div><!-- /container -->
 </div><!-- /admin-view -->
+
+<!-- NOVO PRODUTO MODAL -->
+<div class="acct-overlay" id="novo-produto-overlay" style="z-index:350" onclick="if(event.target===this)fecharNovoProduto()">
+  <div class="acct-modal">
+    <div class="acct-hd" style="background:var(--p);border-radius:18px 18px 0 0;display:flex;align-items:center;justify-content:space-between">
+      <h3 style="color:#fff">Novo Produto</h3>
+      <button onclick="fecharNovoProduto()" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;line-height:1;padding:0 4px">&times;</button>
+    </div>
+    <div class="acct-body">
+      <div class="grid2" style="margin-bottom:8px">
+        <div class="field" style="margin:0"><label>Nome *</label><input type="text" id="np-nome" placeholder="Ex: Luva de Látex P" /></div>
+        <div class="field" style="margin:0"><label>Categoria *</label><input type="text" id="np-cat" placeholder="Ex: Luvas de Látex" list="cat-list" /></div>
+      </div>
+      <datalist id="cat-list"></datalist>
+      <div style="margin-bottom:8px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div class="field" style="margin:0"><label>Preço (R$) *</label><input type="number" id="np-preco" step="0.01" min="0" placeholder="0,00" /></div>
+        <div class="field" style="margin:0"><label>Estoque</label><input type="number" id="np-estoque" min="0" placeholder="0" /></div>
+        <div class="field" style="margin:0"><label>Emoji</label><input type="text" id="np-emoji" placeholder="🧤" maxlength="4" /></div>
+      </div>
+      <div class="field"><label>Unidade / Descrição</label><input type="text" id="np-unidade" placeholder="Ex: caixa c/ 100 unidades" /></div>
+      <div class="field">
+        <label>Foto do produto <span style="font-weight:400;color:var(--muted)">(opcional — substitui o emoji)</span></label>
+        <label class="foto-label" for="np-foto">📷 Selecionar foto</label>
+        <input type="file" id="np-foto" accept="image/*" style="display:none" onchange="npFotoChange(this)">
+        <img id="np-preview" class="np-preview" alt="preview">
+        <button id="np-limpar-foto" style="display:none;background:none;border:none;color:var(--red);font-size:12px;cursor:pointer;margin-top:4px" onclick="npLimparFoto()">✕ Remover foto</button>
+      </div>
+      <button class="venda-submit" onclick="addProduto()" style="margin-top:4px">+ Adicionar produto</button>
+    </div>
+  </div>
+</div>
 
 <!-- Print -->
 <div id="recibo-print"></div>
@@ -1523,6 +1533,12 @@ function removeProd(i){
   produtos.splice(i,1); save(); syncProdutos(); renderAdminEstoque();
 }
 
+function abrirNovoProduto(){
+  document.getElementById('novo-produto-overlay').classList.add('open');
+}
+function fecharNovoProduto(){
+  document.getElementById('novo-produto-overlay').classList.remove('open');
+}
 function addProduto(){
   var nome=(document.getElementById('np-nome').value||'').trim();
   var cat=(document.getElementById('np-cat').value||'').trim();
@@ -1539,6 +1555,7 @@ function addProduto(){
   save(); syncProdutos(); renderAdminEstoque();
   ['np-nome','np-cat','np-preco','np-estoque','np-unidade','np-emoji'].forEach(function(id){ document.getElementById(id).value=''; });
   npLimparFoto();
+  fecharNovoProduto();
   showToast('Produto adicionado!');
 }
 
