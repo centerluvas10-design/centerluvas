@@ -202,15 +202,38 @@ function doPost(e) {
     var rows = sheet.getDataRange().getValues();
     for (var i = 0; i < rows.length; i++) {
       if (String(rows[i][2]).toLowerCase() === email) {
-        if (String(rows[i][4]) === senhaHash) {
+        var storedHash = String(rows[i][4]);
+        var isTemp     = storedHash.indexOf('TEMP:') === 0;
+        var realHash   = isTemp ? storedHash.slice(5) : storedHash;
+        if (realHash === senhaHash) {
           var token = Utilities.getUuid();
           sheet.getRange(i + 1, 7).setValue(token);
-          return jsonOut(JSON.stringify({ok:true, token:token, nome:String(rows[i][1])}));
+          var resp = {ok:true, token:token, nome:String(rows[i][1])};
+          if (isTemp) resp.needs_password_change = true;
+          return jsonOut(JSON.stringify(resp));
         }
         return jsonOut(JSON.stringify({erro:'senha incorreta'}));
       }
     }
     return jsonOut(JSON.stringify({erro:'usuário não encontrado'}));
+  }
+
+  // ── Change password after temp login ──
+  if (tipo === 'trocar_senha') {
+    var token        = data.token || '';
+    var novaSenhaHash = data.nova_senha_hash || '';
+    if (!token || !novaSenhaHash) return jsonOut(JSON.stringify({erro:'dados incompletos'}));
+    var ss    = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('CL_Clientes');
+    if (!sheet) return jsonOut(JSON.stringify({erro:'usuário não encontrado'}));
+    var rows = sheet.getDataRange().getValues();
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][6]) === token) {
+        sheet.getRange(i + 1, 5).setValue(novaSenhaHash); // store plain hash, no TEMP: prefix
+        return jsonOut(JSON.stringify({ok:true}));
+      }
+    }
+    return jsonOut(JSON.stringify({erro:'sessão inválida'}));
   }
 
   // ── New store order ──
@@ -278,7 +301,8 @@ function doPost(e) {
         var tempSenha = Math.random().toString(36).substr(2, 8);
         var digest    = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, tempSenha, Utilities.Charset.UTF_8);
         var hexHash   = digest.map(function(b){ return ('0' + (b < 0 ? b + 256 : b).toString(16)).slice(-2); }).join('');
-        sheet.getRange(i + 1, 5).setValue(hexHash);
+        // Store with TEMP: prefix so login detects it and forces password change
+        sheet.getRange(i + 1, 5).setValue('TEMP:' + hexHash);
         return jsonOut(JSON.stringify({ok:true, temp_senha:tempSenha}));
       }
     }

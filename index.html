@@ -342,6 +342,21 @@ textarea{resize:vertical;min-height:55px;}
   </div>
 </div>
 
+<!-- ══════════════════════ TROCAR SENHA MODAL ══════════════════════ -->
+<div class="acct-overlay" id="trocar-senha-overlay" style="z-index:400">
+  <div class="acct-modal">
+    <div class="acct-hd" style="background:var(--p);border-radius:18px 18px 0 0">
+      <h3 style="color:#fff">Nova senha necessária</h3>
+    </div>
+    <div class="acct-body">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.5">Você está usando uma senha temporária. Crie uma senha permanente para continuar.</p>
+      <div class="acct-field"><label>Nova senha</label><input type="password" id="ts-nova" placeholder="Mínimo 6 caracteres" /></div>
+      <div class="acct-field"><label>Confirmar nova senha</label><input type="password" id="ts-confirma" placeholder="Repita a senha" /></div>
+      <button class="acct-submit" onclick="confirmarTrocaSenha()">Salvar nova senha</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════════════ CART DRAWER ══════════════════════ -->
 <div class="drawer-overlay" id="drawer-overlay" onclick="fecharCarrinho()"></div>
 <div class="cart-drawer" id="cart-drawer">
@@ -878,16 +893,51 @@ function fazerLogin(){
   hashSenha(senha).then(function(hash){
     return fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},
       body:JSON.stringify({tipo:'login',email:email,senha_hash:hash})});
-  }).then(function(r){ return r.json(); })
-  .then(function(data){
+  }).then(function(r){ return r.text(); })
+  .then(function(txt){
+    var data; try{ data=JSON.parse(txt); }catch(e){ showToast('Erro de conexão. Tente novamente.',true); return; }
     if(data.erro){ showToast(data.erro,true); return; }
     localStorage.setItem('cl_token',data.token);
     localStorage.setItem('cl_nome',data.nome);
     localStorage.setItem('cl_email',email);
     if(data.telefone) localStorage.setItem('cl_tel',data.telefone);
     atualizarBtnConta();
-    abrirConta();
-    showToast('Bem-vindo(a), '+data.nome.split(' ')[0]+'!');
+    fecharConta();
+    if(data.needs_password_change){
+      abrirTrocaSenha();
+    } else {
+      abrirConta();
+      showToast('Bem-vindo(a), '+data.nome.split(' ')[0]+'!');
+    }
+  })
+  .catch(function(){ showToast('Erro de conexão. Tente novamente.',true); });
+}
+
+function abrirTrocaSenha(){
+  document.getElementById('ts-nova').value='';
+  document.getElementById('ts-confirma').value='';
+  document.getElementById('trocar-senha-overlay').classList.add('open');
+}
+
+function confirmarTrocaSenha(){
+  var nova=document.getElementById('ts-nova').value||'';
+  var conf=document.getElementById('ts-confirma').value||'';
+  if(nova.length<6){ showToast('A senha deve ter ao menos 6 caracteres.',true); return; }
+  if(nova!==conf){ showToast('As senhas não coincidem.',true); return; }
+  var token=localStorage.getItem('cl_token')||'';
+  hashSenha(nova).then(function(hash){
+    return fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},
+      body:JSON.stringify({tipo:'trocar_senha',token:token,nova_senha_hash:hash})});
+  }).then(function(r){ return r.text(); })
+  .then(function(txt){
+    var d; try{ d=JSON.parse(txt); }catch(e){ d={}; }
+    if(d&&d.ok){
+      document.getElementById('trocar-senha-overlay').classList.remove('open');
+      abrirConta();
+      showToast('Senha atualizada! Bem-vindo(a).');
+    } else {
+      showToast(d&&d.erro?d.erro:'Erro ao salvar senha. Tente novamente.',true);
+    }
   })
   .catch(function(){ showToast('Erro de conexão. Tente novamente.',true); });
 }
