@@ -127,6 +127,13 @@ function doPost(e) {
 
   var tipo = data.tipo || '';
 
+  // ── Admin login verification (always checked against server, never local default) ──
+  if (tipo === 'admin_login') {
+    var pass = data.password || '';
+    if (!checkAdminPass(pass, props)) return jsonOut(JSON.stringify({erro:'senha incorreta'}));
+    return jsonOut(JSON.stringify({ok:true}));
+  }
+
   // ── Save config ──
   if (tipo === 'config') {
     var oldRaw = props.getProperty('cl_cfg');

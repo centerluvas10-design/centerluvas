@@ -1433,9 +1433,26 @@ function mostrarAdmin(skipAuth){
   if(!skipAuth && localStorage.getItem('admin_logged')!=='1'){
     var pass=prompt('Senha do painel:');
     if(pass===null) return;
-    if(pass!==cfg.adminPass){ showToast('Senha incorreta.',true); return; }
-    localStorage.setItem('admin_logged','1');
+    fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},
+      body:JSON.stringify({tipo:'admin_login',password:pass})
+    }).then(function(r){ return r.text(); })
+    .then(function(txt){
+      var d; try{ d=JSON.parse(txt); }catch(e){ d={}; }
+      if(d&&d.ok){
+        cfg.adminPass=pass; save();
+        localStorage.setItem('admin_logged','1');
+        _abrirPainelAdmin();
+      } else {
+        showToast('Senha incorreta.',true);
+      }
+    })
+    .catch(function(){ showToast('Erro de conexão. Tente novamente.',true); });
+    return;
   }
+  _abrirPainelAdmin();
+}
+
+function _abrirPainelAdmin(){
   document.getElementById('store-view').style.display='none';
   document.getElementById('admin-view').style.display='block';
   renderAdminEstoque();
