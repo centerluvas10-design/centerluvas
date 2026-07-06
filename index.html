@@ -799,13 +799,13 @@ function comprimirImagem(file){
       var img=new Image();
       img.onerror=reject;
       img.onload=function(){
-        var MAX=600;
+        var MAX=800;
         var w=img.width,h=img.height;
         if(w>h){ if(w>MAX){h=Math.round(h*MAX/w);w=MAX;} } else { if(h>MAX){w=Math.round(w*MAX/h);h=MAX;} }
         var canvas=document.createElement('canvas');
         canvas.width=w; canvas.height=h;
         canvas.getContext('2d').drawImage(img,0,0,w,h);
-        resolve(canvas.toDataURL('image/jpeg',0.85));
+        resolve(canvas.toDataURL('image/jpeg',0.90));
       };
       img.src=ev.target.result;
     };
