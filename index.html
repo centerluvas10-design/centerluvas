@@ -811,10 +811,8 @@ function _comprimirBase(file, MAX, quality){
     reader.readAsDataURL(file);
   });
 }
-// High quality for localStorage (800px/90%)
+// High quality for localStorage and Drive upload (800px/90%)
 function comprimirImagem(file){ return _comprimirBase(file,800,0.90); }
-// Small thumbnail for server (fits PropertiesService 9KB limit)
-function comprimirImagemServidor(file){ return _comprimirBase(file,100,0.70); }
 
 function npFotoChange(inp){
   if(!inp.files||!inp.files[0]) return;
@@ -847,16 +845,20 @@ function uploadImgProd(file){
     saveImgs();
     renderAdminEstoque();
     renderLoja();
-    showToast('Foto salva!');
-    // Sync a small thumbnail to server (fits PropertiesService 9KB limit)
-    comprimirImagemServidor(file).then(function(small){ syncImgProd(id,small); }).catch(function(){});
+    showToast('Enviando foto...');
+    syncImgProdDrive(id,dataUrl,function(url){
+      if(url){ prodImgs[id]=url; saveImgs(); renderAdminEstoque(); renderLoja(); }
+      showToast('Foto salva!');
+    });
   }).catch(function(){ showToast('Erro ao processar imagem.',true); });
 }
 
-function syncImgProd(id,dataUrl){
+function syncImgProdDrive(id,dataUrl,cb){
   fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},
-    body:JSON.stringify({tipo:'produto_img',id:id,img:dataUrl})
-  }).catch(function(){});
+    body:JSON.stringify({tipo:'produto_img_drive',id:id,img:dataUrl})
+  }).then(function(r){ return r.text(); })
+    .then(function(txt){ var res; try{res=JSON.parse(txt);}catch(e){} if(cb) cb(res&&res.url?res.url:null); })
+    .catch(function(){ if(cb) cb(null); });
 }
 
 function deleteImgProd(id){
@@ -1150,8 +1152,13 @@ function fetchRemoteConfig(){
     .then(function(txt){
       var data; try{ data=JSON.parse(txt); }catch(e){ return; }
       if(!data||typeof data!=='object') return;
-      // Use server image only if no local version exists (local is always higher quality)
-      Object.keys(data).forEach(function(k){ if(data[k]&&!prodImgs[k]) prodImgs[k]=data[k]; });
+      // Prefer Drive URLs from server; only skip if local is already a URL (not base64)
+      Object.keys(data).forEach(function(k){
+        if(!data[k]) return;
+        var local=prodImgs[k]||'';
+        // Use server value if: no local, OR server has Drive URL and local has base64
+        if(!local||(data[k].indexOf('http')===0&&local.indexOf('data:')===0)) prodImgs[k]=data[k];
+      });
       saveImgs();
       renderLoja();
     })
@@ -1575,9 +1582,9 @@ function addProduto(){
   produtos.push({id:newId,nome:nome,cat:cat,preco:preco,estoque:est,unidade:uni||'un.',emoji:emoji,ativo:true});
   if(npPendingImg){
     prodImgs[newId]=npPendingImg; saveImgs();
-    // Sync small thumbnail to server
-    var npFile=document.getElementById('np-foto').files[0];
-    if(npFile){ comprimirImagemServidor(npFile).then(function(small){ syncImgProd(newId,small); }).catch(function(){}); }
+    syncImgProdDrive(newId,npPendingImg,function(url){
+      if(url){ prodImgs[newId]=url; saveImgs(); renderAdminEstoque(); renderLoja(); }
+    });
   }
   save(); syncProdutos(); renderAdminEstoque();
   ['np-nome','np-cat','np-preco','np-estoque','np-unidade','np-emoji'].forEach(function(id){ document.getElementById(id).value=''; });

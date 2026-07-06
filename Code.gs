@@ -28,7 +28,13 @@ function doGet(e) {
 
   // ── Product images ──
   if (type === 'prod_imgs') {
-    return jsonOut(props.getProperty('cl_imgs') || '{}');
+    var imgUrls = JSON.parse(props.getProperty('cl_img_urls') || '{}');
+    var imgOld  = JSON.parse(props.getProperty('cl_imgs')     || '{}');
+    // Merge: Drive URLs override old base64 thumbnails
+    var merged = {};
+    Object.keys(imgOld).forEach(function(k){ merged[k] = imgOld[k]; });
+    Object.keys(imgUrls).forEach(function(k){ merged[k] = imgUrls[k]; });
+    return jsonOut(JSON.stringify(merged));
   }
 
   // ── All orders (admin only) ──
@@ -195,19 +201,47 @@ function doPost(e) {
     return jsonOut(JSON.stringify({ok:true}));
   }
 
-  // ── Save product image ──
-  if (tipo === 'produto_img') {
-    var imgs = JSON.parse(props.getProperty('cl_imgs') || '{}');
-    imgs[data.id] = data.img;
-    props.setProperty('cl_imgs', JSON.stringify(imgs));
-    return jsonOut(JSON.stringify({ok:true}));
+  // ── Upload product image to Google Drive ──
+  if (tipo === 'produto_img_drive') {
+    var prodId    = data.id  || '';
+    var imgBase64 = data.img || '';
+    if (!prodId || !imgBase64) return jsonOut(JSON.stringify({erro:'dados incompletos'}));
+    var b64     = imgBase64.replace(/^data:image\/\w+;base64,/, '');
+    var decoded = Utilities.base64Decode(b64);
+    var blob    = Utilities.newBlob(decoded, 'image/jpeg', prodId + '.jpg');
+    var folderIt = DriveApp.getFoldersByName('CL_Imagens');
+    var folder   = folderIt.hasNext() ? folderIt.next() : DriveApp.createFolder('CL_Imagens');
+    var imgIds = JSON.parse(props.getProperty('cl_img_ids') || '{}');
+    if (imgIds[prodId]) {
+      try { DriveApp.getFileById(imgIds[prodId]).setTrashed(true); } catch(ex) {}
+    }
+    var file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    var fileId = file.getId();
+    var url    = 'https://drive.google.com/uc?export=view&id=' + fileId;
+    var imgUrls = JSON.parse(props.getProperty('cl_img_urls') || '{}');
+    imgUrls[prodId] = url;
+    props.setProperty('cl_img_urls', JSON.stringify(imgUrls));
+    imgIds[prodId] = fileId;
+    props.setProperty('cl_img_ids', JSON.stringify(imgIds));
+    return jsonOut(JSON.stringify({ok:true, url:url}));
   }
 
   // ── Delete product image ──
   if (tipo === 'delete_img') {
+    var prodId = data.id || '';
     var imgs = JSON.parse(props.getProperty('cl_imgs') || '{}');
-    delete imgs[data.id];
+    delete imgs[prodId];
     props.setProperty('cl_imgs', JSON.stringify(imgs));
+    var imgUrls = JSON.parse(props.getProperty('cl_img_urls') || '{}');
+    delete imgUrls[prodId];
+    props.setProperty('cl_img_urls', JSON.stringify(imgUrls));
+    var imgIds = JSON.parse(props.getProperty('cl_img_ids') || '{}');
+    if (imgIds[prodId]) {
+      try { DriveApp.getFileById(imgIds[prodId]).setTrashed(true); } catch(ex) {}
+    }
+    delete imgIds[prodId];
+    props.setProperty('cl_img_ids', JSON.stringify(imgIds));
     return jsonOut(JSON.stringify({ok:true}));
   }
 
@@ -356,6 +390,13 @@ function doPost(e) {
 }
 
 // ── Helpers ──
+
+// ── Run this function ONCE from the Apps Script editor to authorize DriveApp ──
+function testarDrive() {
+  var folder = DriveApp.createFolder('CL_Imagens_Teste');
+  folder.setTrashed(true);
+  Logger.log('DriveApp autorizado com sucesso.');
+}
 
 // ── Run this function ONCE from the Apps Script editor to authorize Gmail ──
 function testarEmail() {
