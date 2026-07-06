@@ -28,8 +28,9 @@ function doGet(e) {
 
   // ── Product images ──
   if (type === 'prod_imgs') {
-    var imgUrls = JSON.parse(props.getProperty('cl_img_urls') || '{}');
-    var imgOld  = JSON.parse(props.getProperty('cl_imgs')     || '{}');
+    var imgUrls, imgOld;
+    try { imgUrls = JSON.parse(props.getProperty('cl_img_urls') || '{}'); } catch(e) { imgUrls = {}; }
+    try { imgOld  = JSON.parse(props.getProperty('cl_imgs')     || '{}'); } catch(e) { imgOld  = {}; }
     // Merge: Drive URLs override old base64 thumbnails
     var merged = {};
     Object.keys(imgOld).forEach(function(k){ merged[k] = imgOld[k]; });
@@ -211,7 +212,7 @@ function doPost(e) {
     var blob    = Utilities.newBlob(decoded, 'image/jpeg', prodId + '.jpg');
     var folderIt = DriveApp.getFoldersByName('CL_Imagens');
     var folder   = folderIt.hasNext() ? folderIt.next() : DriveApp.createFolder('CL_Imagens');
-    var imgIds = JSON.parse(props.getProperty('cl_img_ids') || '{}');
+    var imgIds; try { imgIds = JSON.parse(props.getProperty('cl_img_ids') || '{}'); } catch(e) { imgIds = {}; }
     if (imgIds[prodId]) {
       try { DriveApp.getFileById(imgIds[prodId]).setTrashed(true); } catch(ex) {}
     }
@@ -219,7 +220,7 @@ function doPost(e) {
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     var fileId = file.getId();
     var url    = 'https://drive.google.com/uc?export=view&id=' + fileId;
-    var imgUrls = JSON.parse(props.getProperty('cl_img_urls') || '{}');
+    var imgUrls; try { imgUrls = JSON.parse(props.getProperty('cl_img_urls') || '{}'); } catch(e) { imgUrls = {}; }
     imgUrls[prodId] = url;
     props.setProperty('cl_img_urls', JSON.stringify(imgUrls));
     imgIds[prodId] = fileId;
@@ -230,13 +231,13 @@ function doPost(e) {
   // ── Delete product image ──
   if (tipo === 'delete_img') {
     var prodId = data.id || '';
-    var imgs = JSON.parse(props.getProperty('cl_imgs') || '{}');
+    var imgs; try { imgs = JSON.parse(props.getProperty('cl_imgs') || '{}'); } catch(e) { imgs = {}; }
     delete imgs[prodId];
     props.setProperty('cl_imgs', JSON.stringify(imgs));
-    var imgUrls = JSON.parse(props.getProperty('cl_img_urls') || '{}');
+    var imgUrls; try { imgUrls = JSON.parse(props.getProperty('cl_img_urls') || '{}'); } catch(e) { imgUrls = {}; }
     delete imgUrls[prodId];
     props.setProperty('cl_img_urls', JSON.stringify(imgUrls));
-    var imgIds = JSON.parse(props.getProperty('cl_img_ids') || '{}');
+    var imgIds; try { imgIds = JSON.parse(props.getProperty('cl_img_ids') || '{}'); } catch(e) { imgIds = {}; }
     if (imgIds[prodId]) {
       try { DriveApp.getFileById(imgIds[prodId]).setTrashed(true); } catch(ex) {}
     }

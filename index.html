@@ -751,7 +751,14 @@ function loadData(){
   try{ pedidos = JSON.parse(localStorage.getItem('cl_pedidos') || '[]'); }catch(e){ pedidos = []; }
   try{ vendas = JSON.parse(localStorage.getItem('vendas_cl') || '[]'); }catch(e){ vendas = []; }
   try{ despesas = JSON.parse(localStorage.getItem('despesas_cl') || '[]'); }catch(e){ despesas = []; }
-  try{ prodImgs = JSON.parse(localStorage.getItem('cl_imgs') || '{}'); }catch(e){ prodImgs = {}; }
+  try{
+    var _stored=JSON.parse(localStorage.getItem('cl_imgs')||'{}');
+    prodImgs={};
+    Object.keys(_stored).forEach(function(k){
+      var v=_stored[k]||'';
+      if(v.indexOf('http')===0||(v.indexOf('data:image/')===0&&v.length>300)) prodImgs[k]=v;
+    });
+  }catch(e){ prodImgs={}; }
   carrinho = []; catAtiva = 'Todos'; pagSel = 'pix'; tipoEntrega = 'entrega'; pedidoAtual = null; ultimaVenda = null;
 }
 
@@ -851,6 +858,10 @@ function uploadImgProd(file){
       showToast('Foto salva!');
     });
   }).catch(function(){ showToast('Erro ao processar imagem.',true); });
+}
+
+function imgError(id){
+  delete prodImgs[id]; saveImgs(); renderAdminEstoque(); renderLoja();
 }
 
 function syncImgProdDrive(id,dataUrl,cb){
@@ -1256,7 +1267,7 @@ function renderLoja(){
       actHtml='<div class="qty-ctrl"><button class="qty-btn" onclick="changeCart(\''+p.id+'\',-1)">−</button><span class="qty-num">'+qty+'</span><button class="qty-btn" onclick="changeCart(\''+p.id+'\',1)">+</button></div>';
     }
     var mediaHtml=prodImgs[p.id]
-      ?'<div class="prod-img-wrap"><img src="'+prodImgs[p.id]+'" class="prod-img-card" alt="'+esc(p.nome)+'"></div>'
+      ?'<div class="prod-img-wrap"><img src="'+prodImgs[p.id]+'" class="prod-img-card" alt="'+esc(p.nome)+'" onerror="this.onerror=null;imgError(\''+p.id+'\')"></div>'
       :'<div class="prod-img-wrap"><span class="prod-emoji">'+esc(p.emoji)+'</span></div>';
     return '<div class="prod-card">'+mediaHtml+'<div class="prod-card-body"><div class="prod-name">'+esc(p.nome)+'</div><div class="prod-unit">'+esc(p.unidade||'')+'</div><div class="prod-price">R$ '+p.preco.toFixed(2).replace('.',',')+'</div><div class="prod-stock '+stockCls+'">● '+stockTxt+'</div>'+actHtml+'</div></div>';
   }).join('');
@@ -1539,7 +1550,7 @@ function renderAdminEstoque(){
   tbody.innerHTML=lista.map(function(p){
     var i=produtos.indexOf(p);
     var thumb=prodImgs[p.id]
-      ?'<img src="'+prodImgs[p.id]+'" class="prod-thumb" alt="">'
+      ?'<img src="'+prodImgs[p.id]+'" class="prod-thumb" alt="" onerror="this.onerror=null;imgError(\''+p.id+'\')">'
       :'<span style="font-size:26px;line-height:36px;text-align:center;width:36px;display:inline-block">'+esc(p.emoji)+'</span>';
     return '<tr><td><div style="display:flex;align-items:center;gap:7px">'+thumb+
       '<div><strong>'+esc(p.nome)+'</strong><br><small style="color:var(--muted)">'+esc(p.cat)+' · '+esc(p.unidade||'')+'</small><br>'+
