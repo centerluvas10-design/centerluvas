@@ -774,7 +774,12 @@ function save(){
 }
 
 function saveImgs(){
-  try{ localStorage.setItem('cl_imgs', JSON.stringify(prodImgs)); }catch(e){}
+  // Persiste apenas base64 local; URLs do Drive vêm do servidor a cada carregamento
+  var toSave={};
+  Object.keys(prodImgs).forEach(function(k){
+    if((prodImgs[k]||'').indexOf('data:image/')===0) toSave[k]=prodImgs[k];
+  });
+  try{ localStorage.setItem('cl_imgs', JSON.stringify(toSave)); }catch(e){}
 }
 
 // ══════════ PIX BR CODE ══════════
@@ -861,16 +866,20 @@ function uploadImgProd(file){
 
 function imgError(el,id){
   el.onerror=null;
-  var isData=(el.src||'').indexOf('data:')===0;
-  if(isData){
-    // Base64 corrompido — limpa
-    _imgBadIds[id]=true; delete prodImgs[id]; saveImgs();
-  }
-  // Mostra emoji no lugar (sem re-renderizar a página toda)
+  var src=el.src||'';
+  // Só limpa do prodImgs se for base64 claramente corrompido (< 300 chars)
+  var isCorrupt=src.indexOf('data:image/')===0&&src.length<300;
+  if(isCorrupt){ _imgBadIds[id]=true; delete prodImgs[id]; saveImgs(); }
   var wrap=el.parentNode;
-  if(wrap){
+  if(!wrap) return;
+  // No card da loja, parentNode é .prod-img-wrap — seguro substituir
+  if(wrap.classList&&wrap.classList.contains('prod-img-wrap')){
     var p=produtos.find(function(x){return x.id===id;});
     wrap.innerHTML='<span class="prod-emoji">'+(p?esc(p.emoji||'📦'):'📦')+'</span>';
+  } else {
+    // No admin estoque, parentNode é o div flex (contém nome+botões) — só esconde o img
+    el.style.display='none';
+    if(isCorrupt) renderAdminEstoque();
   }
 }
 
