@@ -1408,7 +1408,7 @@ function mostrarPix(total,pedId){
   if(cfg.whatsapp){
     var msg='Olá! Realizei um pedido na Center Luvas.\nPedido: '+pedId+'\nTotal: R$ '+total.toFixed(2).replace('.',',')+'\nSegue o comprovante:';
     var wBtn=document.getElementById('pix-wpp-btn');
-    wBtn.href='https://wa.me/'+cfg.whatsapp.replace(/\D/g,'')+' ?text='+encodeURIComponent(msg);
+    wBtn.href='https://wa.me/'+cfg.whatsapp.replace(/\D/g,'')+'?text='+encodeURIComponent(msg);
     wBtn.style.display='flex';
   } else {
     document.getElementById('pix-wpp-btn').style.display='none';
@@ -1437,13 +1437,15 @@ function mostrarSucesso(){
   var sub=(nome?'Obrigado, '+nome+'! ':'')+
     (pagSel==='pix'?'Após confirmação do Pix entraremos em contato.':'Em breve entraremos em contato para confirmar.');
   document.getElementById('success-sub').textContent=sub;
+  var wb=document.getElementById('success-wpp-btn');
   if(cfg.whatsapp&&pedidoAtual){
     var ordem=pedidoAtual.itens.map(function(i){ return i.qty+'x '+i.nome; }).join(', ');
     var msg='Olá! Sou '+pedidoAtual.cliente.nome+'.\nPedido: '+pedidoAtual.id+'\nItens: '+ordem+'\nTotal: R$ '+pedidoAtual.total.toFixed(2).replace('.',',')+'\nPagamento: '+{pix:'Pix',dinheiro:'Dinheiro',cartao:'Cartão'}[pedidoAtual.pagamento]+(pedidoAtual.obs?'\nObs: '+pedidoAtual.obs:'');
-    var wb=document.getElementById('success-wpp-btn');
-    wb.href='https://wa.me/'+cfg.whatsapp.replace(/\D/g,'')+' ?text='+encodeURIComponent(msg);
-    wb.style.display='flex';
-  } else { document.getElementById('success-wpp-btn').style.display='none'; }
+    wb.href='https://wa.me/'+cfg.whatsapp.replace(/\D/g,'')+'?text='+encodeURIComponent(msg);
+  } else {
+    wb.href='https://wa.me/message/AG5W7TG534FSI1';
+  }
+  wb.style.display='flex';
   document.getElementById('success-overlay').classList.add('open');
 }
 function fecharSucesso(){ document.getElementById('success-overlay').classList.remove('open'); pedidoAtual=null; }
