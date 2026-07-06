@@ -847,6 +847,7 @@ function uploadImgProd(file){
     saveImgs();
     syncImgProd(id,dataUrl);
     renderAdminEstoque();
+    renderLoja();
     showToast('Foto salva!');
   }).catch(function(){ showToast('Erro ao processar imagem.',true); });
 }
