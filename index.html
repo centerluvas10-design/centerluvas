@@ -752,9 +752,6 @@ function loadData(){
   try{ vendas = JSON.parse(localStorage.getItem('vendas_cl') || '[]'); }catch(e){ vendas = []; }
   try{ despesas = JSON.parse(localStorage.getItem('despesas_cl') || '[]'); }catch(e){ despesas = []; }
   try{ prodImgs = JSON.parse(localStorage.getItem('cl_imgs') || '{}'); }catch(e){ prodImgs = {}; }
-  // Purge images saved with old low-quality settings (MAX=100,q=0.50 → base64 < 20000 chars)
-  Object.keys(prodImgs).forEach(function(k){ if(prodImgs[k]&&prodImgs[k].length<20000) delete prodImgs[k]; });
-  saveImgs();
   carrinho = []; catAtiva = 'Todos'; pagSel = 'pix'; tipoEntrega = 'entrega'; pedidoAtual = null; ultimaVenda = null;
 }
 
@@ -794,7 +791,7 @@ function pixPayload(key,nome,cidade,valor,txid){
 }
 
 // ══════════ IMAGENS DE PRODUTOS ══════════
-function comprimirImagem(file){
+function _comprimirBase(file, MAX, quality){
   return new Promise(function(resolve,reject){
     var reader=new FileReader();
     reader.onerror=reject;
@@ -802,19 +799,22 @@ function comprimirImagem(file){
       var img=new Image();
       img.onerror=reject;
       img.onload=function(){
-        var MAX=800;
         var w=img.width,h=img.height;
         if(w>h){ if(w>MAX){h=Math.round(h*MAX/w);w=MAX;} } else { if(h>MAX){w=Math.round(w*MAX/h);h=MAX;} }
         var canvas=document.createElement('canvas');
         canvas.width=w; canvas.height=h;
         canvas.getContext('2d').drawImage(img,0,0,w,h);
-        resolve(canvas.toDataURL('image/jpeg',0.90));
+        resolve(canvas.toDataURL('image/jpeg',quality));
       };
       img.src=ev.target.result;
     };
     reader.readAsDataURL(file);
   });
 }
+// High quality for localStorage (800px/90%)
+function comprimirImagem(file){ return _comprimirBase(file,800,0.90); }
+// Small thumbnail for server (fits PropertiesService 9KB limit)
+function comprimirImagemServidor(file){ return _comprimirBase(file,100,0.70); }
 
 function npFotoChange(inp){
   if(!inp.files||!inp.files[0]) return;
@@ -845,10 +845,11 @@ function uploadImgProd(file){
   comprimirImagem(file).then(function(dataUrl){
     prodImgs[id]=dataUrl;
     saveImgs();
-    syncImgProd(id,dataUrl);
     renderAdminEstoque();
     renderLoja();
     showToast('Foto salva!');
+    // Sync a small thumbnail to server (fits PropertiesService 9KB limit)
+    comprimirImagemServidor(file).then(function(small){ syncImgProd(id,small); }).catch(function(){});
   }).catch(function(){ showToast('Erro ao processar imagem.',true); });
 }
 
@@ -1149,19 +1150,8 @@ function fetchRemoteConfig(){
     .then(function(txt){
       var data; try{ data=JSON.parse(txt); }catch(e){ return; }
       if(!data||typeof data!=='object') return;
-      // Only overwrite local image if server version is higher quality (longer base64)
-      Object.keys(data).forEach(function(k){
-        if(data[k] && data[k].length > (prodImgs[k]||'').length) prodImgs[k]=data[k];
-      });
-      // Purge low-quality images (saved with old MAX=100/q=0.50 settings)
-      var toPurge=[];
-      Object.keys(prodImgs).forEach(function(k){ if(prodImgs[k]&&prodImgs[k].length<20000){ toPurge.push(k); delete prodImgs[k]; } });
-      if(toPurge.length){
-        toPurge.forEach(function(id){
-          fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},
-            body:JSON.stringify({tipo:'produto_img',id:id,img:''})});
-        });
-      }
+      // Use server image only if no local version exists (local is always higher quality)
+      Object.keys(data).forEach(function(k){ if(data[k]&&!prodImgs[k]) prodImgs[k]=data[k]; });
       saveImgs();
       renderLoja();
     })
@@ -1583,7 +1573,12 @@ function addProduto(){
   if(preco<=0){ showToast('Informe o preço.',true); return; }
   var newId='p'+Date.now();
   produtos.push({id:newId,nome:nome,cat:cat,preco:preco,estoque:est,unidade:uni||'un.',emoji:emoji,ativo:true});
-  if(npPendingImg){ prodImgs[newId]=npPendingImg; saveImgs(); syncImgProd(newId,npPendingImg); }
+  if(npPendingImg){
+    prodImgs[newId]=npPendingImg; saveImgs();
+    // Sync small thumbnail to server
+    var npFile=document.getElementById('np-foto').files[0];
+    if(npFile){ comprimirImagemServidor(npFile).then(function(small){ syncImgProd(newId,small); }).catch(function(){}); }
+  }
   save(); syncProdutos(); renderAdminEstoque();
   ['np-nome','np-cat','np-preco','np-estoque','np-unidade','np-emoji'].forEach(function(id){ document.getElementById(id).value=''; });
   npLimparFoto();
