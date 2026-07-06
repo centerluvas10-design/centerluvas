@@ -752,6 +752,9 @@ function loadData(){
   try{ vendas = JSON.parse(localStorage.getItem('vendas_cl') || '[]'); }catch(e){ vendas = []; }
   try{ despesas = JSON.parse(localStorage.getItem('despesas_cl') || '[]'); }catch(e){ despesas = []; }
   try{ prodImgs = JSON.parse(localStorage.getItem('cl_imgs') || '{}'); }catch(e){ prodImgs = {}; }
+  // Purge images saved with old low-quality settings (MAX=100,q=0.50 → base64 < 20000 chars)
+  Object.keys(prodImgs).forEach(function(k){ if(prodImgs[k]&&prodImgs[k].length<20000) delete prodImgs[k]; });
+  saveImgs();
   carrinho = []; catAtiva = 'Todos'; pagSel = 'pix'; tipoEntrega = 'entrega'; pedidoAtual = null; ultimaVenda = null;
 }
 
@@ -1146,6 +1149,15 @@ function fetchRemoteConfig(){
       var data; try{ data=JSON.parse(txt); }catch(e){ return; }
       if(!data||typeof data!=='object') return;
       Object.keys(data).forEach(function(k){ if(data[k]) prodImgs[k]=data[k]; });
+      // Purge low-quality server images and clear them on server too
+      var toPurge=[];
+      Object.keys(prodImgs).forEach(function(k){ if(prodImgs[k]&&prodImgs[k].length<20000){ toPurge.push(k); delete prodImgs[k]; } });
+      if(toPurge.length){
+        toPurge.forEach(function(id){
+          fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},
+            body:JSON.stringify({tipo:'produto_img',id:id,img:''})});
+        });
+      }
       saveImgs();
     })
     .catch(function(){});
