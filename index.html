@@ -741,6 +741,7 @@ var CFG_DEFAULT = {
 
 var cfg, produtos, pedidos, vendas, despesas, carrinho, catAtiva, pagSel, tipoEntrega, pedidoAtual, ultimaVenda;
 var prodImgs = {};
+var _imgBadIds = {};
 var pedidosList = [];
 var imgTargetIdx = -1;
 var npPendingImg = null;
@@ -861,6 +862,7 @@ function uploadImgProd(file){
 }
 
 function imgError(id){
+  _imgBadIds[id]=true;
   delete prodImgs[id]; saveImgs(); renderAdminEstoque(); renderLoja();
 }
 
@@ -1163,12 +1165,13 @@ function fetchRemoteConfig(){
     .then(function(txt){
       var data; try{ data=JSON.parse(txt); }catch(e){ return; }
       if(!data||typeof data!=='object') return;
-      // Prefer Drive URLs from server; only skip if local is already a URL (not base64)
       Object.keys(data).forEach(function(k){
-        if(!data[k]) return;
+        var v=data[k]||'';
+        if(!v) return;
+        if(_imgBadIds[k]) return; // skip IDs that failed to load this session
+        if(v.indexOf('data:image/')===0&&v.length<300) return; // reject short/corrupted base64
         var local=prodImgs[k]||'';
-        // Use server value if: no local, OR server has Drive URL and local has base64
-        if(!local||(data[k].indexOf('http')===0&&local.indexOf('data:')===0)) prodImgs[k]=data[k];
+        if(!local||(v.indexOf('http')===0&&local.indexOf('data:')===0)) prodImgs[k]=v;
       });
       saveImgs();
       renderLoja();

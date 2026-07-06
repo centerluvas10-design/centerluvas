@@ -392,6 +392,13 @@ function doPost(e) {
 
 // ── Helpers ──
 
+// ── Run this function ONCE to clear corrupted image data from PropertiesService ──
+function limparImgCache() {
+  var props = PropertiesService.getScriptProperties();
+  props.deleteProperty('cl_imgs');
+  Logger.log('cl_imgs apagado com sucesso.');
+}
+
 // ── Run this function ONCE from the Apps Script editor to authorize DriveApp ──
 function testarDrive() {
   var folder = DriveApp.createFolder('CL_Imagens_Teste');
