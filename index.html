@@ -1149,8 +1149,11 @@ function fetchRemoteConfig(){
     .then(function(txt){
       var data; try{ data=JSON.parse(txt); }catch(e){ return; }
       if(!data||typeof data!=='object') return;
-      Object.keys(data).forEach(function(k){ if(data[k]) prodImgs[k]=data[k]; });
-      // Purge low-quality server images and clear them on server too
+      // Only overwrite local image if server version is higher quality (longer base64)
+      Object.keys(data).forEach(function(k){
+        if(data[k] && data[k].length > (prodImgs[k]||'').length) prodImgs[k]=data[k];
+      });
+      // Purge low-quality images (saved with old MAX=100/q=0.50 settings)
       var toPurge=[];
       Object.keys(prodImgs).forEach(function(k){ if(prodImgs[k]&&prodImgs[k].length<20000){ toPurge.push(k); delete prodImgs[k]; } });
       if(toPurge.length){
@@ -1160,6 +1163,7 @@ function fetchRemoteConfig(){
         });
       }
       saveImgs();
+      renderLoja();
     })
     .catch(function(){});
   return Promise.all([cfgPromise, prodPromise, imgPromise]).then(function(){ save(); });
