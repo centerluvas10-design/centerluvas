@@ -854,16 +854,24 @@ function uploadImgProd(file){
     renderAdminEstoque();
     renderLoja();
     showToast('Enviando foto...');
-    syncImgProdDrive(id,dataUrl,function(url){
-      if(url){ prodImgs[id]=url; saveImgs(); renderAdminEstoque(); renderLoja(); }
-      showToast('Foto salva!');
-    });
+    // Sobe para Drive em segundo plano; base64 local NÃO é substituído
+    syncImgProdDrive(id,dataUrl,function(){ showToast('Foto salva!'); });
   }).catch(function(){ showToast('Erro ao processar imagem.',true); });
 }
 
-function imgError(id){
-  _imgBadIds[id]=true;
-  delete prodImgs[id]; saveImgs(); renderAdminEstoque(); renderLoja();
+function imgError(el,id){
+  el.onerror=null;
+  var isData=(el.src||'').indexOf('data:')===0;
+  if(isData){
+    // Base64 corrompido — limpa
+    _imgBadIds[id]=true; delete prodImgs[id]; saveImgs();
+  }
+  // Mostra emoji no lugar (sem re-renderizar a página toda)
+  var wrap=el.parentNode;
+  if(wrap){
+    var p=produtos.find(function(x){return x.id===id;});
+    wrap.innerHTML='<span class="prod-emoji">'+(p?esc(p.emoji||'📦'):'📦')+'</span>';
+  }
 }
 
 function syncImgProdDrive(id,dataUrl,cb){
@@ -1270,7 +1278,7 @@ function renderLoja(){
       actHtml='<div class="qty-ctrl"><button class="qty-btn" onclick="changeCart(\''+p.id+'\',-1)">−</button><span class="qty-num">'+qty+'</span><button class="qty-btn" onclick="changeCart(\''+p.id+'\',1)">+</button></div>';
     }
     var mediaHtml=prodImgs[p.id]
-      ?'<div class="prod-img-wrap"><img src="'+prodImgs[p.id]+'" class="prod-img-card" alt="'+esc(p.nome)+'" onerror="this.onerror=null;imgError(\''+p.id+'\')"></div>'
+      ?'<div class="prod-img-wrap"><img src="'+prodImgs[p.id]+'" class="prod-img-card" alt="'+esc(p.nome)+'" onerror="imgError(this,\''+p.id+'\')"></div>'
       :'<div class="prod-img-wrap"><span class="prod-emoji">'+esc(p.emoji)+'</span></div>';
     return '<div class="prod-card">'+mediaHtml+'<div class="prod-card-body"><div class="prod-name">'+esc(p.nome)+'</div><div class="prod-unit">'+esc(p.unidade||'')+'</div><div class="prod-price">R$ '+p.preco.toFixed(2).replace('.',',')+'</div><div class="prod-stock '+stockCls+'">● '+stockTxt+'</div>'+actHtml+'</div></div>';
   }).join('');
@@ -1553,7 +1561,7 @@ function renderAdminEstoque(){
   tbody.innerHTML=lista.map(function(p){
     var i=produtos.indexOf(p);
     var thumb=prodImgs[p.id]
-      ?'<img src="'+prodImgs[p.id]+'" class="prod-thumb" alt="" onerror="this.onerror=null;imgError(\''+p.id+'\')">'
+      ?'<img src="'+prodImgs[p.id]+'" class="prod-thumb" alt="" onerror="imgError(this,\''+p.id+'\')">'
       :'<span style="font-size:26px;line-height:36px;text-align:center;width:36px;display:inline-block">'+esc(p.emoji)+'</span>';
     return '<tr><td><div style="display:flex;align-items:center;gap:7px">'+thumb+
       '<div><strong>'+esc(p.nome)+'</strong><br><small style="color:var(--muted)">'+esc(p.cat)+' · '+esc(p.unidade||'')+'</small><br>'+
@@ -1596,9 +1604,7 @@ function addProduto(){
   produtos.push({id:newId,nome:nome,cat:cat,preco:preco,estoque:est,unidade:uni||'un.',emoji:emoji,ativo:true});
   if(npPendingImg){
     prodImgs[newId]=npPendingImg; saveImgs();
-    syncImgProdDrive(newId,npPendingImg,function(url){
-      if(url){ prodImgs[newId]=url; saveImgs(); renderAdminEstoque(); renderLoja(); }
-    });
+    syncImgProdDrive(newId,npPendingImg,function(){}); // sobe para Drive; base64 local mantido
   }
   save(); syncProdutos(); renderAdminEstoque();
   ['np-nome','np-cat','np-preco','np-estoque','np-unidade','np-emoji'].forEach(function(id){ document.getElementById(id).value=''; });
