@@ -752,12 +752,28 @@ function loadData(){
   try{ pedidos = JSON.parse(localStorage.getItem('cl_pedidos') || '[]'); }catch(e){ pedidos = []; }
   try{ vendas = JSON.parse(localStorage.getItem('vendas_cl') || '[]'); }catch(e){ vendas = []; }
   try{ despesas = JSON.parse(localStorage.getItem('despesas_cl') || '[]'); }catch(e){ despesas = []; }
+  // Migração do formato antigo (cl_imgs → cl_img_{id} por produto)
   try{
-    var _stored=JSON.parse(localStorage.getItem('cl_imgs')||'{}');
-    prodImgs={};
-    Object.keys(_stored).forEach(function(k){
-      var v=_stored[k]||'';
-      if(v.indexOf('data:image/')===0&&v.length>300) prodImgs[k]=v;
+    var _old=JSON.parse(localStorage.getItem('cl_imgs')||'{}');
+    Object.keys(_old).forEach(function(k){
+      var v=_old[k]||'';
+      if(v.indexOf('data:image/')===0&&v.length>300){
+        try{ localStorage.setItem('cl_img_'+k,v); }catch(e){}
+      }
+    });
+    localStorage.removeItem('cl_imgs');
+  }catch(e){}
+  prodImgs={};
+  try{
+    var _keys=[];
+    for(var _li=0;_li<localStorage.length;_li++){
+      var _lk=localStorage.key(_li);
+      if(_lk&&_lk.indexOf('cl_img_')===0) _keys.push(_lk);
+    }
+    _keys.forEach(function(lk){
+      var id=lk.slice(7);
+      var v=localStorage.getItem(lk)||'';
+      if(v.indexOf('data:image/')===0&&v.length>300) prodImgs[id]=v;
     });
   }catch(e){ prodImgs={}; }
   carrinho = []; catAtiva = 'Todos'; pagSel = 'pix'; tipoEntrega = 'entrega'; pedidoAtual = null; ultimaVenda = null;
@@ -774,12 +790,13 @@ function save(){
 }
 
 function saveImgs(){
-  // Persiste apenas base64 local; URLs do Drive vêm do servidor a cada carregamento
-  var toSave={};
   Object.keys(prodImgs).forEach(function(k){
-    if((prodImgs[k]||'').indexOf('data:image/')===0) toSave[k]=prodImgs[k];
+    var v=prodImgs[k]||'';
+    if(v.indexOf('data:image/')===0) try{ localStorage.setItem('cl_img_'+k,v); }catch(e){}
   });
-  try{ localStorage.setItem('cl_imgs', JSON.stringify(toSave)); }catch(e){}
+}
+function removeImgLocal(id){
+  try{ localStorage.removeItem('cl_img_'+id); }catch(e){}
 }
 
 // ══════════ PIX BR CODE ══════════
@@ -869,7 +886,7 @@ function imgError(el,id){
   var src=el.src||'';
   // Só limpa do prodImgs se for base64 claramente corrompido (< 300 chars)
   var isCorrupt=src.indexOf('data:image/')===0&&src.length<300;
-  if(isCorrupt){ _imgBadIds[id]=true; delete prodImgs[id]; saveImgs(); }
+  if(isCorrupt){ _imgBadIds[id]=true; delete prodImgs[id]; removeImgLocal(id); }
   var wrap=el.parentNode;
   if(!wrap) return;
   // No card da loja, parentNode é .prod-img-wrap — seguro substituir
@@ -1589,7 +1606,7 @@ function toggleProd(i){ produtos[i].ativo=!produtos[i].ativo; save(); syncProdut
 function removeProd(i){
   if(!confirm('Remover "'+produtos[i].nome+'"?')) return;
   var id=produtos[i].id;
-  delete prodImgs[id]; saveImgs(); deleteImgProd(id);
+  delete prodImgs[id]; removeImgLocal(id); deleteImgProd(id);
   produtos.splice(i,1); save(); syncProdutos(); renderAdminEstoque();
 }
 
