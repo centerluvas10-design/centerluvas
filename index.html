@@ -293,6 +293,23 @@ textarea{resize:vertical;min-height:55px;}
 .foto-strip-add:hover{background:#eef;border-color:var(--p);color:var(--p);}
 .prod-img-wrap.clickable{cursor:zoom-in;}
 .prod-img-wrap.clickable:hover img{opacity:.92;}
+/* ── INLINE NAME EDIT ── */
+.nome-inline{font-weight:700;font-size:13px;border:none;background:transparent;padding:0;width:100%;min-width:80px;outline:none;cursor:text;color:#1d1d1f;font-family:inherit;}
+.nome-inline:focus{background:#f0f8ff;border-bottom:1.5px solid var(--p);border-radius:2px;}
+/* ── ADMIN SIZE CHIPS ── */
+.sz-chip{font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;border:1.5px solid var(--border);background:#fff;cursor:pointer;-webkit-appearance:none;color:var(--muted);line-height:1.4;}
+.sz-chip.on{background:var(--p);border-color:var(--p);color:#fff;}
+.sz-add-btn{font-size:11px;padding:2px 8px;border-radius:10px;border:1.5px dashed var(--border);background:#fff;cursor:pointer;color:var(--muted);-webkit-appearance:none;}
+/* ── STORE SIZE PICKER ── */
+.spov{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;display:flex;align-items:flex-end;justify-content:center;}
+.sp-sheet{background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:20px 20px 36px;}
+.sp-title{font-size:16px;font-weight:700;text-align:center;margin-bottom:16px;color:#1d1d1f;}
+.sp-chips{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:20px;}
+.sp-chip{min-width:56px;padding:12px 18px;border-radius:14px;border:2px solid var(--border);background:#fff;font-size:16px;font-weight:800;cursor:pointer;-webkit-appearance:none;transition:all .12s;}
+.sp-chip:active,.sp-chip:hover{border-color:var(--p);color:var(--p);background:#f0f8ff;}
+.sp-cancel{width:100%;padding:13px;border:none;background:var(--bg);border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;color:var(--muted);-webkit-appearance:none;}
+/* ── CART SIZE BADGE ── */
+.ci-tam{font-size:11px;font-weight:700;color:var(--p);background:#e8f4f7;border-radius:6px;padding:1px 6px;margin-left:4px;}
 </style>
 </head>
 <body>
@@ -331,6 +348,14 @@ textarea{resize:vertical;min-height:55px;}
     <button class="lb-close" onclick="fecharLightbox()">&#10005;</button>
     <div id="lb-dots" class="lb-dots"></div>
     <span id="lb-counter" class="lb-counter"></span>
+  </div>
+  <!-- Size picker -->
+  <div id="size-picker-ov" class="spov" style="display:none" onclick="fecharSizePicker()">
+    <div class="sp-sheet" onclick="event.stopPropagation()">
+      <div class="sp-title" id="sp-title">Selecione o tamanho</div>
+      <div class="sp-chips" id="sp-chips"></div>
+      <button class="sp-cancel" onclick="fecharSizePicker()">Cancelar</button>
+    </div>
   </div>
   <div class="store-footer">
     Center Luvas · Cariri<br>
@@ -783,6 +808,8 @@ var imgTargetIdx = -1;
 var imgExtraTargetId = '';
 var lbImagens = [];
 var lbIdx = 0;
+var spTargetId = '';
+var TAMS_COMUNS = ['PP','P','M','G','GG','XG','XGG'];
 var npPendingImg = null;
 
 function loadData(){
@@ -1016,6 +1043,72 @@ function deleteAllImgExtraDrive(prodId){
   fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},
     body:JSON.stringify({tipo:'delete_all_img_extra',id:prodId})
   }).catch(function(){});
+}
+
+// ── PRODUCT NAME + SIZES (ADMIN) ──
+function updNome(i,v){
+  v=(v||'').trim();
+  if(!v||!produtos[i]) return;
+  if(produtos[i].nome===v) return;
+  produtos[i].nome=v; save(); syncProdutos();
+}
+
+function addTamanhoSel(i,sel){
+  var tam=sel.value; sel.value='';
+  if(!tam) return;
+  if(tam==='__c__'){
+    tam=prompt('Digite o tamanho (ex: 36, 38, Único):');
+    if(!tam||!tam.trim()) return;
+    tam=tam.trim().toUpperCase();
+  }
+  if(!produtos[i].tamanhos) produtos[i].tamanhos=[];
+  if(produtos[i].tamanhos.indexOf(tam)===-1){
+    produtos[i].tamanhos.push(tam);
+    save(); syncProdutos(); renderAdminEstoque();
+  }
+}
+
+function removeTamanho(i,tam){
+  if(!produtos[i]||!produtos[i].tamanhos) return;
+  var idx=produtos[i].tamanhos.indexOf(tam);
+  if(idx!==-1){
+    produtos[i].tamanhos.splice(idx,1);
+    save(); syncProdutos(); renderAdminEstoque();
+  }
+}
+
+// ── SIZE PICKER (STORE) ──
+function abrirSizePicker(prodId){
+  var p=produtos.find(function(x){return x.id===prodId;});
+  if(!p||!p.tamanhos||!p.tamanhos.length) return addCart(prodId);
+  spTargetId=prodId;
+  document.getElementById('sp-title').textContent='Tamanho — '+p.nome;
+  document.getElementById('sp-chips').innerHTML=p.tamanhos.map(function(t){
+    return '<button class="sp-chip" onclick="addCartComTamanho(\''+prodId+'\',\''+esc(t)+'\')">'+esc(t)+'</button>';
+  }).join('');
+  document.getElementById('size-picker-ov').style.display='flex';
+}
+
+function fecharSizePicker(){
+  document.getElementById('size-picker-ov').style.display='none';
+}
+
+function addCartComTamanho(prodId,tamanho){
+  fecharSizePicker();
+  var p=produtos.find(function(x){return x.id===prodId;});
+  if(!p||p.estoque<=0) return;
+  var ci=carrinho.find(function(c){return c.id===prodId&&c.tamanho===tamanho;});
+  if(ci){ if(ci.qty<p.estoque) ci.qty++; }
+  else carrinho.push({id:prodId,qty:1,nome:p.nome,preco:p.preco,emoji:p.emoji,tamanho:tamanho});
+  renderLoja();
+}
+
+function changeCartIdx(idx,delta){
+  if(idx<0||idx>=carrinho.length) return;
+  carrinho[idx].qty+=delta;
+  if(carrinho[idx].qty<=0) carrinho.splice(idx,1);
+  renderLoja();
+  renderCartItems();
 }
 
 function imgError(el,id){
@@ -1474,13 +1567,17 @@ function renderLoja(){
     return;
   }
   document.getElementById('prod-grid').innerHTML=fil.map(function(p){
-    var ci=carrinho.find(function(c){ return c.id===p.id; });
+    var hasTams=!!(p.tamanhos&&p.tamanhos.length);
+    var ci=hasTams?null:carrinho.find(function(c){return c.id===p.id&&!c.tamanho;});
     var qty=ci?ci.qty:0;
     var stockTxt=p.estoque<=0?'Sem estoque':p.estoque<=10?'Últimas unidades':'Em estoque';
     var stockCls=p.estoque<=0?'stock-out':p.estoque<=10?'stock-low':'stock-ok';
     var actHtml;
     if(p.estoque<=0){
       actHtml='<button class="atc-btn" disabled>Sem estoque</button>';
+    } else if(hasTams){
+      var inCart=carrinho.some(function(c){return c.id===p.id;});
+      actHtml='<button class="atc-btn" onclick="abrirSizePicker(\''+p.id+'\')">Adicionar'+(inCart?' mais':'')+'</button>';
     } else if(qty===0){
       actHtml='<button class="atc-btn" onclick="addCart(\''+p.id+'\')">Adicionar</button>';
     } else {
@@ -1579,9 +1676,10 @@ function renderCartItems(){
     return;
   }
   var tot=0;
-  body.innerHTML=carrinho.map(function(c){
+  body.innerHTML=carrinho.map(function(c,idx){
     var sub=c.qty*c.preco; tot+=sub;
-    return '<div class="cart-item"><div class="ci-info"><div class="ci-name">'+esc(c.emoji)+' '+esc(c.nome)+'</div><div class="ci-price">'+c.qty+'× R$ '+c.preco.toFixed(2).replace('.',',')+'</div></div><div class="ci-ctrl"><button class="ci-btn" onclick="changeCart(\''+c.id+'\',-1)">−</button><span class="ci-qty">'+c.qty+'</span><button class="ci-btn" onclick="changeCart(\''+c.id+'\',1)">+</button></div></div>';
+    var tamBadge=c.tamanho?'<span class="ci-tam">'+esc(c.tamanho)+'</span>':'';
+    return '<div class="cart-item"><div class="ci-info"><div class="ci-name">'+esc(c.emoji)+' '+esc(c.nome)+tamBadge+'</div><div class="ci-price">'+c.qty+'× R$ '+c.preco.toFixed(2).replace('.',',')+'</div></div><div class="ci-ctrl"><button class="ci-btn" onclick="changeCartIdx('+idx+',-1)">−</button><span class="ci-qty">'+c.qty+'</span><button class="ci-btn" onclick="changeCartIdx('+idx+',1)">+</button></div></div>';
   }).join('');
   document.getElementById('cart-total-disp').textContent='R$ '+tot.toFixed(2).replace('.',',');
 }
@@ -1644,7 +1742,7 @@ function confirmarPedido(){
     id:id,data:now,
     cliente:{nome:nome,tel:tel,endereco:end},
     cliente_email:cl?cl.email:'',
-    itens:carrinho.map(function(c){ return {id:c.id,nome:c.nome,qty:c.qty,preco:c.preco}; }),
+    itens:carrinho.map(function(c){ return {id:c.id,nome:c.nome,qty:c.qty,preco:c.preco,tamanho:c.tamanho||''}; }),
     total:total,pagamento:pagSel,obs:obs,status:'aguardando'
   };
 
@@ -1660,7 +1758,7 @@ function confirmarPedido(){
   syncProdutos();
 
   // register order in Google Sheets
-  var prodStr=pedidoAtual.itens.map(function(i){ return i.qty+'x '+i.nome+' (R$'+i.preco.toFixed(2)+')'; }).join(' | ');
+  var prodStr=pedidoAtual.itens.map(function(i){ return i.qty+'x '+i.nome+(i.tamanho?' ['+i.tamanho+']':'')+' (R$'+i.preco.toFixed(2)+')'; }).join(' | ');
   fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},
     body:JSON.stringify({tipo:'pedido',id:id,data:now,cliente:nome,telefone:tel,endereco:end,produtos:prodStr,total:total.toFixed(2),pagamento:pagSel,obs:obs,cliente_email:cl?cl.email:''})
   }).catch(function(e){ console.error('Erro ao registrar pedido:',e); });
@@ -1817,7 +1915,19 @@ function renderAdminEstoque(){
     var addBtn=totalImgs<5?'<button class="foto-strip-add" onclick="addExtraFoto(\''+p.id+'\')" title="Adicionar foto">+</button>':'';
     var strip='<div class="prod-fotos-strip">'+primaryItem+extras+addBtn+'</div>';
     return '<tr><td><div style="display:flex;align-items:flex-start;gap:8px">'+strip+
-      '<div style="padding-top:2px"><strong>'+esc(p.nome)+'</strong><br><small style="color:var(--muted)">'+esc(p.cat)+' · '+esc(p.unidade||'')+'</small></div>'+
+      (function(){
+        var tams=p.tamanhos||[];
+        var tamsHtml=tams.map(function(t){
+          return '<span class="sz-chip on">'+esc(t)+'<button style="background:none;border:none;cursor:pointer;color:#fff;margin-left:2px;padding:0;font-size:10px;line-height:1;-webkit-appearance:none" onclick="removeTamanho('+i+',\''+esc(t)+'\')">×</button></span>';
+        }).join('');
+        var opts=TAMS_COMUNS.filter(function(t){return tams.indexOf(t)===-1;}).map(function(t){return '<option value="'+t+'">'+t+'</option>';}).join('');
+        var addSel='<select class="sz-add-btn" onchange="addTamanhoSel('+i+',this)"><option value="">+ Tamanho</option>'+opts+'<option value="__c__">Personalizado…</option></select>';
+        return '<div style="padding-top:2px;min-width:0">'+
+          '<input type="text" class="nome-inline" value="'+esc(p.nome)+'" onblur="updNome('+i+',this.value)" onkeydown="if(event.key===\'Enter\')this.blur()">'+
+          '<div><small style="color:var(--muted)">'+esc(p.cat)+' · '+esc(p.unidade||'')+'</small></div>'+
+          '<div style="display:flex;gap:3px;flex-wrap:wrap;align-items:center;margin-top:4px">'+tamsHtml+addSel+'</div>'+
+          '</div>';
+      })()+
       '</div></td>'+
       '<td>R$ <input class="sml-input" type="number" value="'+p.preco.toFixed(2)+'" step="0.01" min="0" onchange="updPreco('+i+',this.value)" style="width:72px"></td>'+
       '<td><input class="sml-input" type="number" value="'+p.estoque+'" min="0" onchange="updEstoque('+i+',this.value)"></td>'+
