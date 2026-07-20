@@ -765,30 +765,22 @@ function loadData(){
   }catch(e){}
   prodImgs={};
   try{
-    var _keys=[];
-    for(var _li=0;_li<localStorage.length;_li++){
-      var _lk=localStorage.key(_li);
-      if(_lk&&_lk.indexOf('cl_img_')===0) _keys.push(_lk);
-    }
-    _keys.forEach(function(lk){
-      var id=lk.slice(7);
-      var v=localStorage.getItem(lk)||'';
-      if(v.indexOf('data:image/')===0&&v.length>300) prodImgs[id]=v;
+    Object.keys(localStorage).forEach(function(lk){
+      if(lk.indexOf('cl_img_')===0){
+        var id=lk.slice(7);
+        var v=localStorage.getItem(lk)||'';
+        if(v.indexOf('data:image/')===0&&v.length>300) prodImgs[id]=v;
+      }
+    });
+    // Fallback: URL do Drive salva localmente (backup pequeno)
+    Object.keys(localStorage).forEach(function(uk){
+      if(uk.indexOf('cl_imgurl_')===0){
+        var id=uk.slice(10);
+        var url=localStorage.getItem(uk)||'';
+        if(url.indexOf('http')===0&&!prodImgs[id]) prodImgs[id]=url;
+      }
     });
   }catch(e){ prodImgs={}; }
-  // Fallback: URL do Drive salva localmente (backup pequeno)
-  try{
-    var _urlKeys=[];
-    for(var _ui=0;_ui<localStorage.length;_ui++){
-      var _uk=localStorage.key(_ui);
-      if(_uk&&_uk.indexOf('cl_imgurl_')===0) _urlKeys.push(_uk);
-    }
-    _urlKeys.forEach(function(uk){
-      var id=uk.slice(10);
-      var url=localStorage.getItem(uk)||'';
-      if(url.indexOf('http')===0&&!prodImgs[id]) prodImgs[id]=url;
-    });
-  }catch(e){}
   carrinho = []; catAtiva = 'Todos'; pagSel = 'pix'; tipoEntrega = 'entrega'; pedidoAtual = null; ultimaVenda = null;
 }
 
@@ -910,17 +902,25 @@ function uploadImgProd(file){
 function imgError(el,id){
   el.onerror=null;
   var src=el.src||'';
-  // Só limpa do prodImgs se for base64 claramente corrompido (< 300 chars)
   var isCorrupt=src.indexOf('data:image/')===0&&src.length<300;
   if(isCorrupt){ _imgBadIds[id]=true; delete prodImgs[id]; removeImgLocal(id); }
+  // Se a URL falhou (Drive URL, etc.), tenta o base64 do localStorage como fallback
+  if(!isCorrupt){
+    var b64='';
+    try{ b64=localStorage.getItem('cl_img_'+id)||''; }catch(e){}
+    if(b64.indexOf('data:image/')===0&&b64.length>300){
+      prodImgs[id]=b64;
+      el.onerror=function(){ imgError(el,id); };
+      el.src=b64;
+      return;
+    }
+  }
   var wrap=el.parentNode;
   if(!wrap) return;
-  // No card da loja, parentNode é .prod-img-wrap — seguro substituir
   if(wrap.classList&&wrap.classList.contains('prod-img-wrap')){
     var p=produtos.find(function(x){return x.id===id;});
     wrap.innerHTML='<span class="prod-emoji">'+(p?esc(p.emoji||'📦'):'📦')+'</span>';
   } else {
-    // No admin estoque, parentNode é o div flex (contém nome+botões) — só esconde o img
     el.style.display='none';
     if(isCorrupt) renderAdminEstoque();
   }
