@@ -1188,7 +1188,7 @@ function fetchRemoteConfig(){
         if(_imgBadIds[k]) return; // skip IDs that failed to load this session
         if(v.indexOf('data:image/')===0&&v.length<300) return; // reject short/corrupted base64
         var local=prodImgs[k]||'';
-        if(!local||(v.indexOf('http')===0&&local.indexOf('data:')===0)) prodImgs[k]=v;
+        if(!local) prodImgs[k]=v;
       });
       saveImgs();
       renderLoja();
