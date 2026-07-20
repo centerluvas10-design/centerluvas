@@ -26,16 +26,22 @@ function doGet(e) {
     return jsonOut(props.getProperty('cl_produtos') || '[]');
   }
 
-  // ── Product images ──
+  // ── Product main images ──
   if (type === 'prod_imgs') {
     var imgUrls, imgOld;
     try { imgUrls = JSON.parse(props.getProperty('cl_img_urls') || '{}'); } catch(e) { imgUrls = {}; }
     try { imgOld  = JSON.parse(props.getProperty('cl_imgs')     || '{}'); } catch(e) { imgOld  = {}; }
-    // Merge: Drive URLs override old base64 thumbnails
     var merged = {};
     Object.keys(imgOld).forEach(function(k){ merged[k] = imgOld[k]; });
     Object.keys(imgUrls).forEach(function(k){ merged[k] = imgUrls[k]; });
     return jsonOut(JSON.stringify(merged));
+  }
+
+  // ── Product extra images ──
+  if (type === 'prod_imgs_extra') {
+    var extra;
+    try { extra = JSON.parse(props.getProperty('cl_img_extra_urls') || '{}'); } catch(e) { extra = {}; }
+    return jsonOut(JSON.stringify(extra));
   }
 
   // ── All orders (admin only) ──
@@ -111,7 +117,7 @@ function doGet(e) {
     var rows  = sheet.getDataRange().getValues();
     var lista = [];
     for (var i = 0; i < rows.length; i++) {
-      if (!rows[i][0] || rows[i][2] === 'email') continue; // skip empty rows and header
+      if (!rows[i][0] || rows[i][2] === 'email') continue;
       lista.push({
         id:        String(rows[i][0]),
         nome:      String(rows[i][1]),
@@ -134,27 +140,21 @@ function doPost(e) {
 
   var tipo = data.tipo || '';
 
-  // ── Admin login verification (server-side; tracks failures and emails password after 3 wrong attempts) ──
+  // ── Admin login ──
   if (tipo === 'admin_login') {
     var pass = data.password || '';
-
-    // Load failure counter (reset automatically after 1 hour)
     var failsRaw = props.getProperty('cl_login_fails');
     var fails    = failsRaw ? JSON.parse(failsRaw) : {count:0, ts:0};
     if (Date.now() - fails.ts > 3600000) fails = {count:0, ts:0};
-
     if (checkAdminPass(pass, props)) {
       props.deleteProperty('cl_login_fails');
       return jsonOut(JSON.stringify({ok:true}));
     }
-
-    // Wrong password
     fails.count += 1;
     fails.ts = Date.now();
     props.setProperty('cl_login_fails', JSON.stringify(fails));
-
     if (fails.count >= 3) {
-      props.deleteProperty('cl_login_fails'); // reset so next cycle starts fresh
+      props.deleteProperty('cl_login_fails');
       var cfgRaw   = props.getProperty('cl_cfg');
       var adminCfg = cfgRaw ? JSON.parse(cfgRaw) : {};
       var adminPass = adminCfg.adminPass || '1234';
@@ -173,7 +173,6 @@ function doPost(e) {
       } catch(ex) { emailErro = String(ex.message || ex); }
       return jsonOut(JSON.stringify({erro:'senha incorreta', email_enviado:emailSent, email_erro:emailErro}));
     }
-
     return jsonOut(JSON.stringify({erro:'senha incorreta', tentativas_restantes: 3 - fails.count}));
   }
 
@@ -196,13 +195,13 @@ function doPost(e) {
 
   // ── Save products ──
   if (tipo === 'produtos') {
-    var prodStr = data.produtos; // already a JSON string (double-encoded by frontend)
+    var prodStr = data.produtos;
     try { JSON.parse(prodStr); } catch(ex) { return jsonOut(JSON.stringify({erro:'produtos json invalido'})); }
     props.setProperty('cl_produtos', prodStr);
     return jsonOut(JSON.stringify({ok:true}));
   }
 
-  // ── Upload product image to Google Drive ──
+  // ── Upload main product image to Drive ──
   if (tipo === 'produto_img_drive') {
     var prodId    = data.id  || '';
     var imgBase64 = data.img || '';
@@ -228,7 +227,69 @@ function doPost(e) {
     return jsonOut(JSON.stringify({ok:true, url:url}));
   }
 
-  // ── Delete product image ──
+  // ── Upload extra product image to Drive ──
+  if (tipo === 'produto_img_extra_drive') {
+    var prodId    = data.id  || '';
+    var imgBase64 = data.img || '';
+    if (!prodId || !imgBase64) return jsonOut(JSON.stringify({erro:'dados incompletos'}));
+    var b64     = imgBase64.replace(/^data:image\/\w+;base64,/, '');
+    var decoded = Utilities.base64Decode(b64);
+    var fname   = prodId + '_extra_' + Date.now() + '.jpg';
+    var blob    = Utilities.newBlob(decoded, 'image/jpeg', fname);
+    var folderIt = DriveApp.getFoldersByName('CL_Imagens');
+    var folder   = folderIt.hasNext() ? folderIt.next() : DriveApp.createFolder('CL_Imagens');
+    var file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    var fileId = file.getId();
+    var url    = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w800';
+    var extraUrls; try { extraUrls = JSON.parse(props.getProperty('cl_img_extra_urls') || '{}'); } catch(e) { extraUrls = {}; }
+    if (!Array.isArray(extraUrls[prodId])) extraUrls[prodId] = [];
+    extraUrls[prodId].push(url);
+    props.setProperty('cl_img_extra_urls', JSON.stringify(extraUrls));
+    var extraIds; try { extraIds = JSON.parse(props.getProperty('cl_img_extra_ids') || '{}'); } catch(e) { extraIds = {}; }
+    if (!Array.isArray(extraIds[prodId])) extraIds[prodId] = [];
+    extraIds[prodId].push(fileId);
+    props.setProperty('cl_img_extra_ids', JSON.stringify(extraIds));
+    return jsonOut(JSON.stringify({ok:true, url:url}));
+  }
+
+  // ── Delete one extra image (matched by URL) ──
+  if (tipo === 'delete_img_extra') {
+    var prodId    = data.id  || '';
+    var targetUrl = data.url || '';
+    var extraUrls; try { extraUrls = JSON.parse(props.getProperty('cl_img_extra_urls') || '{}'); } catch(e) { extraUrls = {}; }
+    var extraIds;  try { extraIds  = JSON.parse(props.getProperty('cl_img_extra_ids')  || '{}'); } catch(e) { extraIds  = {}; }
+    var urlArr = Array.isArray(extraUrls[prodId]) ? extraUrls[prodId] : [];
+    var idArr  = Array.isArray(extraIds[prodId])  ? extraIds[prodId]  : [];
+    var idx = urlArr.indexOf(targetUrl);
+    if (idx !== -1) {
+      if (idArr[idx]) { try { DriveApp.getFileById(idArr[idx]).setTrashed(true); } catch(ex) {} }
+      urlArr.splice(idx, 1);
+      idArr.splice(idx, 1);
+      extraUrls[prodId] = urlArr;
+      extraIds[prodId]  = idArr;
+      props.setProperty('cl_img_extra_urls', JSON.stringify(extraUrls));
+      props.setProperty('cl_img_extra_ids', JSON.stringify(extraIds));
+    }
+    return jsonOut(JSON.stringify({ok:true}));
+  }
+
+  // ── Delete all extra images for a product ──
+  if (tipo === 'delete_all_img_extra') {
+    var prodId = data.id || '';
+    var extraIds; try { extraIds = JSON.parse(props.getProperty('cl_img_extra_ids') || '{}'); } catch(e) { extraIds = {}; }
+    if (Array.isArray(extraIds[prodId])) {
+      extraIds[prodId].forEach(function(fid){ try { DriveApp.getFileById(fid).setTrashed(true); } catch(ex) {} });
+    }
+    delete extraIds[prodId];
+    props.setProperty('cl_img_extra_ids', JSON.stringify(extraIds));
+    var extraUrls; try { extraUrls = JSON.parse(props.getProperty('cl_img_extra_urls') || '{}'); } catch(e) { extraUrls = {}; }
+    delete extraUrls[prodId];
+    props.setProperty('cl_img_extra_urls', JSON.stringify(extraUrls));
+    return jsonOut(JSON.stringify({ok:true}));
+  }
+
+  // ── Delete main product image ──
   if (tipo === 'delete_img') {
     var prodId = data.id || '';
     var imgs; try { imgs = JSON.parse(props.getProperty('cl_imgs') || '{}'); } catch(e) { imgs = {}; }
@@ -243,10 +304,20 @@ function doPost(e) {
     }
     delete imgIds[prodId];
     props.setProperty('cl_img_ids', JSON.stringify(imgIds));
+    // Also delete all extras
+    var extraUrls; try { extraUrls = JSON.parse(props.getProperty('cl_img_extra_urls') || '{}'); } catch(e) { extraUrls = {}; }
+    delete extraUrls[prodId];
+    props.setProperty('cl_img_extra_urls', JSON.stringify(extraUrls));
+    var extraIds; try { extraIds = JSON.parse(props.getProperty('cl_img_extra_ids') || '{}'); } catch(e) { extraIds = {}; }
+    if (Array.isArray(extraIds[prodId])) {
+      extraIds[prodId].forEach(function(fid){ try { DriveApp.getFileById(fid).setTrashed(true); } catch(ex) {} });
+    }
+    delete extraIds[prodId];
+    props.setProperty('cl_img_extra_ids', JSON.stringify(extraIds));
     return jsonOut(JSON.stringify({ok:true}));
   }
 
-  // ── Register new client account ──
+  // ── Register new client ──
   if (tipo === 'registro') {
     var email     = (data.email || '').toLowerCase().trim();
     var nome      = data.nome || '';
@@ -296,9 +367,9 @@ function doPost(e) {
     return jsonOut(JSON.stringify({erro:'usuário não encontrado'}));
   }
 
-  // ── Change password after temp login ──
+  // ── Change password ──
   if (tipo === 'trocar_senha') {
-    var token        = data.token || '';
+    var token         = data.token || '';
     var novaSenhaHash = data.nova_senha_hash || '';
     if (!token || !novaSenhaHash) return jsonOut(JSON.stringify({erro:'dados incompletos'}));
     var ss    = SpreadsheetApp.getActiveSpreadsheet();
@@ -307,14 +378,14 @@ function doPost(e) {
     var rows = sheet.getDataRange().getValues();
     for (var i = 0; i < rows.length; i++) {
       if (String(rows[i][6]) === token) {
-        sheet.getRange(i + 1, 5).setValue(novaSenhaHash); // store plain hash, no TEMP: prefix
+        sheet.getRange(i + 1, 5).setValue(novaSenhaHash);
         return jsonOut(JSON.stringify({ok:true}));
       }
     }
     return jsonOut(JSON.stringify({erro:'sessão inválida'}));
   }
 
-  // ── New store order ──
+  // ── New order ──
   if (tipo === 'pedido') {
     var ss    = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName('CL_Pedidos');
@@ -322,7 +393,6 @@ function doPost(e) {
       sheet = ss.insertSheet('CL_Pedidos');
       sheet.appendRow(['id','data','cliente_nome','telefone','endereco','produtos','total','pagamento','obs','cliente_email','status']);
     }
-    // Frontend sends: {tipo, id, data, cliente (string name), telefone, endereco, produtos (string), total, pagamento, obs, cliente_email}
     sheet.appendRow([
       data.id            || ('PED' + Date.now()),
       data.data          || new Date().toISOString(),
@@ -349,24 +419,17 @@ function doPost(e) {
     var rows = sheet.getDataRange().getValues();
     for (var i = 0; i < rows.length; i++) {
       if (String(rows[i][0]) === pedidoId) {
-        sheet.getRange(i + 1, 11).setValue(status); // column K = status
+        sheet.getRange(i + 1, 11).setValue(status);
         return jsonOut(JSON.stringify({ok:true}));
       }
     }
     return jsonOut(JSON.stringify({erro:'pedido não encontrado'}));
   }
 
-  // ── Admin manual sale (stock already updated via syncProdutos) ──
-  if (tipo === 'registrar_venda') {
-    return jsonOut(JSON.stringify({ok:true}));
-  }
+  if (tipo === 'registrar_venda')   return jsonOut(JSON.stringify({ok:true}));
+  if (tipo === 'registrar_despesa') return jsonOut(JSON.stringify({ok:true}));
 
-  // ── Register expense ──
-  if (tipo === 'registrar_despesa') {
-    return jsonOut(JSON.stringify({ok:true}));
-  }
-
-  // ── Reset a client's password (admin action) ──
+  // ── Reset client password (admin) ──
   if (tipo === 'reset_senha') {
     if (!checkAdminPass(data.admin_pass || '', props)) return jsonOut(JSON.stringify({erro:'senha incorreta'}));
     var email = (data.email || '').toLowerCase().trim();
@@ -379,7 +442,6 @@ function doPost(e) {
         var tempSenha = Math.random().toString(36).substr(2, 8);
         var digest    = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, tempSenha, Utilities.Charset.UTF_8);
         var hexHash   = digest.map(function(b){ return ('0' + (b < 0 ? b + 256 : b).toString(16)).slice(-2); }).join('');
-        // Store with TEMP: prefix so login detects it and forces password change
         sheet.getRange(i + 1, 5).setValue('TEMP:' + hexHash);
         return jsonOut(JSON.stringify({ok:true, temp_senha:tempSenha}));
       }
@@ -392,26 +454,23 @@ function doPost(e) {
 
 // ── Helpers ──
 
-// ── Run this function ONCE to clear corrupted image data from PropertiesService ──
 function limparImgCache() {
   var props = PropertiesService.getScriptProperties();
   props.deleteProperty('cl_imgs');
   Logger.log('cl_imgs apagado com sucesso.');
 }
 
-// ── Run this function ONCE from the Apps Script editor to authorize DriveApp ──
 function testarDrive() {
   var folder = DriveApp.createFolder('CL_Imagens_Teste');
   folder.setTrashed(true);
   Logger.log('DriveApp autorizado com sucesso.');
 }
 
-// ── Run this function ONCE from the Apps Script editor to authorize Gmail ──
 function testarEmail() {
   MailApp.sendEmail({
     to:      'centerluvas10@gmail.com',
     subject: 'Center Luvas — Teste de e-mail',
-    body:    'E-mail de teste enviado com sucesso. O sistema de recuperação de senha está autorizado.'
+    body:    'E-mail de teste enviado com sucesso.'
   });
   Logger.log('E-mail enviado com sucesso.');
 }
