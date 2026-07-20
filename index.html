@@ -908,7 +908,7 @@ function imgError(el,id){
   if(!isCorrupt){
     var b64='';
     try{ b64=localStorage.getItem('cl_img_'+id)||''; }catch(e){}
-    if(b64.indexOf('data:image/')===0&&b64.length>300){
+    if(b64.indexOf('data:image/')===0&&b64.length>300&&b64!==src){
       prodImgs[id]=b64;
       el.onerror=function(){ imgError(el,id); };
       el.src=b64;
