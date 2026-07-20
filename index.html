@@ -248,6 +248,12 @@ textarea{resize:vertical;min-height:55px;}
 .acct-field label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px;}
 .acct-field input{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;font-size:14px;outline:none;-webkit-appearance:none;}
 .acct-field input:focus{border-color:var(--p);}
+/* ── TEL WRAP (DDI + number) ── */
+.tel-wrap{display:flex;gap:6px;}
+.tel-wrap .ddi-select{flex-shrink:0;width:auto;max-width:152px;-webkit-appearance:auto;appearance:auto;border:1.5px solid var(--border);border-radius:10px;padding:10px 6px;font-size:13px;background:#fff;color:#1d1d1f;cursor:pointer;}
+.tel-wrap .ddi-select:focus{outline:none;border-color:var(--p);}
+.tel-wrap input{flex:1;border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;font-size:14px;outline:none;-webkit-appearance:none;min-width:0;}
+.tel-wrap input:focus{border-color:var(--p);}
 .acct-submit{width:100%;background:var(--p);color:#fff;border:none;border-radius:12px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;margin-top:4px;-webkit-appearance:none;}
 .my-order-card{background:#f8f9fa;border-radius:12px;padding:14px;margin-bottom:10px;border:1px solid var(--border);}
 .my-order-id{font-size:11px;color:var(--muted);margin-bottom:3px;}
@@ -395,7 +401,7 @@ textarea{resize:vertical;min-height:55px;}
       <div class="acct-body" id="form-reg" style="display:none">
         <div class="acct-field"><label>Nome completo</label><input type="text" id="reg-nome" placeholder="Seu nome" /></div>
         <div class="acct-field"><label>E-mail</label><input type="email" id="reg-email" placeholder="seu@email.com" /></div>
-        <div class="acct-field"><label>WhatsApp</label><input type="tel" id="reg-tel" placeholder="(88) 99999-9999" /></div>
+        <div class="acct-field"><label>WhatsApp</label><div class="tel-wrap"><select id="reg-ddi" class="ddi-select"></select><input type="tel" id="reg-tel" placeholder="99999-9999" /></div></div>
         <div class="acct-field"><label>Senha</label><input type="password" id="reg-senha" placeholder="Mínimo 6 caracteres" /></div>
         <div class="acct-field"><label>Confirmar senha</label><input type="password" id="reg-senha2" placeholder="Repita a senha" /></div>
         <button class="acct-submit" onclick="fazerRegistro()">Criar conta</button>
@@ -411,6 +417,15 @@ textarea{resize:vertical;min-height:55px;}
           </div>
           <button class="reset-pass-btn" onclick="fazerLogout()">Sair</button>
         </div>
+        <!-- Editar dados -->
+        <details style="margin-bottom:16px;border:1.5px solid var(--border);border-radius:12px;overflow:hidden">
+          <summary style="padding:12px 16px;font-size:14px;font-weight:700;color:var(--p);cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center">✏️ Editar dados <span style="font-size:12px;color:var(--muted);font-weight:400">e-mail / WhatsApp</span></summary>
+          <div style="padding:12px 16px 16px">
+            <div class="acct-field"><label>E-mail</label><input type="email" id="perfil-email" placeholder="seu@email.com" /></div>
+            <div class="acct-field"><label>WhatsApp</label><div class="tel-wrap"><select id="perfil-ddi" class="ddi-select"></select><input type="tel" id="perfil-tel" placeholder="99999-9999" /></div></div>
+            <button class="acct-submit" onclick="salvarPerfil()">💾 Salvar dados</button>
+          </div>
+        </details>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
           <div style="font-size:14px;font-weight:700;color:var(--p)">Meus Pedidos</div>
           <button class="reset-pass-btn" onclick="recarregarMeusPedidos()">Atualizar</button>
@@ -1193,9 +1208,113 @@ function hashSenha(s){
     .then(function(buf){ return Array.from(new Uint8Array(buf)).map(function(b){ return b.toString(16).padStart(2,'0'); }).join(''); });
 }
 
+// ── DDI (COUNTRY CODES) ──
+var DDI_LISTA=[
+  // CPLP / Americas
+  {code:'55',name:'🇧🇷 Brasil (+55)'},
+  {code:'244',name:'🇦🇴 Angola (+244)'},
+  {code:'238',name:'🇨🇻 Cabo Verde (+238)'},
+  {code:'245',name:'🇬🇼 Guiné-Bissau (+245)'},
+  {code:'240',name:'🇬🇶 Guiné Equatorial (+240)'},
+  {code:'258',name:'🇲🇿 Moçambique (+258)'},
+  {code:'351',name:'🇵🇹 Portugal (+351)'},
+  {code:'239',name:'🇸🇹 S. Tomé e Príncipe (+239)'},
+  {code:'1',name:'🇺🇸 EUA / Canadá (+1)'},
+  {code:'54',name:'🇦🇷 Argentina (+54)'},
+  {code:'591',name:'🇧🇴 Bolívia (+591)'},
+  {code:'56',name:'🇨🇱 Chile (+56)'},
+  {code:'57',name:'🇨🇴 Colômbia (+57)'},
+  {code:'506',name:'🇨🇷 Costa Rica (+506)'},
+  {code:'53',name:'🇨🇺 Cuba (+53)'},
+  {code:'503',name:'🇸🇻 El Salvador (+503)'},
+  {code:'593',name:'🇪🇨 Equador (+593)'},
+  {code:'502',name:'🇬🇹 Guatemala (+502)'},
+  {code:'592',name:'🇬🇾 Guiana (+592)'},
+  {code:'504',name:'🇭🇳 Honduras (+504)'},
+  {code:'52',name:'🇲🇽 México (+52)'},
+  {code:'505',name:'🇳🇮 Nicarágua (+505)'},
+  {code:'507',name:'🇵🇦 Panamá (+507)'},
+  {code:'595',name:'🇵🇾 Paraguai (+595)'},
+  {code:'51',name:'🇵🇪 Peru (+51)'},
+  {code:'1809',name:'🇩🇴 Rep. Dominicana (+1809)'},
+  {code:'597',name:'🇸🇷 Suriname (+597)'},
+  {code:'598',name:'🇺🇾 Uruguai (+598)'},
+  {code:'58',name:'🇻🇪 Venezuela (+58)'},
+  // Europe
+  {code:'49',name:'🇩🇪 Alemanha (+49)'},
+  {code:'43',name:'🇦🇹 Áustria (+43)'},
+  {code:'32',name:'🇧🇪 Bélgica (+32)'},
+  {code:'45',name:'🇩🇰 Dinamarca (+45)'},
+  {code:'34',name:'🇪🇸 Espanha (+34)'},
+  {code:'358',name:'🇫🇮 Finlândia (+358)'},
+  {code:'33',name:'🇫🇷 França (+33)'},
+  {code:'30',name:'🇬🇷 Grécia (+30)'},
+  {code:'353',name:'🇮🇪 Irlanda (+353)'},
+  {code:'39',name:'🇮🇹 Itália (+39)'},
+  {code:'31',name:'🇳🇱 Holanda (+31)'},
+  {code:'47',name:'🇳🇴 Noruega (+47)'},
+  {code:'48',name:'🇵🇱 Polônia (+48)'},
+  {code:'44',name:'🇬🇧 Reino Unido (+44)'},
+  {code:'7',name:'🇷🇺 Rússia (+7)'},
+  {code:'46',name:'🇸🇪 Suécia (+46)'},
+  {code:'41',name:'🇨🇭 Suíça (+41)'},
+  {code:'380',name:'🇺🇦 Ucrânia (+380)'},
+  // Africa & Middle East
+  {code:'27',name:'🇿🇦 África do Sul (+27)'},
+  {code:'213',name:'🇩🇿 Argélia (+213)'},
+  {code:'973',name:'🇧🇭 Bahrein (+973)'},
+  {code:'20',name:'🇪🇬 Egito (+20)'},
+  {code:'233',name:'🇬🇭 Gana (+233)'},
+  {code:'972',name:'🇮🇱 Israel (+972)'},
+  {code:'254',name:'🇰🇪 Quênia (+254)'},
+  {code:'212',name:'🇲🇦 Marrocos (+212)'},
+  {code:'234',name:'🇳🇬 Nigéria (+234)'},
+  {code:'966',name:'🇸🇦 Arábia Saudita (+966)'},
+  {code:'971',name:'🇦🇪 Emirados Árabes (+971)'},
+  // Asia & Pacific
+  {code:'61',name:'🇦🇺 Austrália (+61)'},
+  {code:'86',name:'🇨🇳 China (+86)'},
+  {code:'82',name:'🇰🇷 Coreia do Sul (+82)'},
+  {code:'63',name:'🇵🇭 Filipinas (+63)'},
+  {code:'91',name:'🇮🇳 Índia (+91)'},
+  {code:'62',name:'🇮🇩 Indonésia (+62)'},
+  {code:'81',name:'🇯🇵 Japão (+81)'},
+  {code:'60',name:'🇲🇾 Malásia (+60)'},
+  {code:'64',name:'🇳🇿 Nova Zelândia (+64)'},
+  {code:'92',name:'🇵🇰 Paquistão (+92)'},
+  {code:'65',name:'🇸🇬 Singapura (+65)'},
+  {code:'66',name:'🇹🇭 Tailândia (+66)'},
+  {code:'84',name:'🇻🇳 Vietnã (+84)'}
+];
+
+function buildDdiOpts(selected){
+  selected=selected||'55';
+  return DDI_LISTA.map(function(d){
+    return '<option value="'+d.code+'"'+(d.code===selected?' selected':'')+'>'+d.name+'</option>';
+  }).join('');
+}
+
+function parseTel(fullTel){
+  if(!fullTel) return {ddi:'55',num:''};
+  var s=fullTel.replace(/^\+/,'').replace(/\D/g,'');
+  var sorted=DDI_LISTA.slice().sort(function(a,b){return b.code.length-a.code.length;});
+  for(var i=0;i<sorted.length;i++){
+    if(s.indexOf(sorted[i].code)===0) return {ddi:sorted[i].code,num:s.slice(sorted[i].code.length)};
+  }
+  return {ddi:'55',num:s};
+}
+
+function initDdiSelects(){
+  var opts=buildDdiOpts('55');
+  ['reg-ddi','perfil-ddi'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el&&!el.options.length) el.innerHTML=opts;
+  });
+}
+
 function clienteLogado(){
   var t=localStorage.getItem('cl_token'),n=localStorage.getItem('cl_nome'),e=localStorage.getItem('cl_email');
-  return (t&&n&&e)?{token:t,nome:n,email:e}:null;
+  return (t&&n&&e)?{token:t,nome:n,email:e,tel:localStorage.getItem('cl_tel')||''}:null;
 }
 
 function atualizarBtnConta(){
@@ -1211,6 +1330,12 @@ function abrirConta(){
     document.getElementById('acct-logado-section').style.display='block';
     document.getElementById('acct-ola').textContent='Olá, '+cl.nome.split(' ')[0]+'!';
     document.getElementById('acct-email-show').textContent=cl.email;
+    // pre-fill edit fields
+    document.getElementById('perfil-email').value=cl.email;
+    var pt=parseTel(cl.tel);
+    var ddiEl=document.getElementById('perfil-ddi');
+    if(ddiEl){ if(!ddiEl.options.length) ddiEl.innerHTML=buildDdiOpts(pt.ddi); else ddiEl.value=pt.ddi; }
+    document.getElementById('perfil-tel').value=pt.num;
     carregarMeusPedidos(cl.token);
   } else {
     document.getElementById('acct-auth-section').style.display='block';
@@ -1221,6 +1346,28 @@ function abrirConta(){
 }
 
 function fecharConta(){ document.getElementById('acct-overlay').classList.remove('open'); }
+
+function salvarPerfil(){
+  var cl=clienteLogado(); if(!cl){ showToast('Faça login novamente.',true); return; }
+  var novoEmail=(document.getElementById('perfil-email').value||'').trim().toLowerCase();
+  var ddi=(document.getElementById('perfil-ddi').value||'55').replace(/\D/g,'');
+  var telNum=(document.getElementById('perfil-tel').value||'').replace(/\D/g,'');
+  var novoTel=telNum?'+'+ddi+telNum:'';
+  if(!novoEmail){ showToast('Informe o e-mail.',true); return; }
+  fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},
+    body:JSON.stringify({tipo:'atualizar_perfil',token:cl.token,novo_email:novoEmail,telefone:novoTel})
+  }).then(function(r){ return r.json(); })
+  .then(function(data){
+    if(data.erro){ showToast(data.erro,true); return; }
+    localStorage.setItem('cl_email',data.email||novoEmail);
+    if(novoTel) localStorage.setItem('cl_tel',novoTel);
+    document.getElementById('acct-email-show').textContent=data.email||novoEmail;
+    atualizarBtnConta();
+    showToast('Dados atualizados com sucesso!');
+  })
+  .catch(function(){ showToast('Erro de conexão. Tente novamente.',true); });
+}
+
 
 function mostrarTabLogin(){
   document.getElementById('form-login').style.display='block';
@@ -1295,7 +1442,9 @@ function confirmarTrocaSenha(){
 function fazerRegistro(){
   var nome=(document.getElementById('reg-nome').value||'').trim();
   var email=(document.getElementById('reg-email').value||'').trim().toLowerCase();
-  var tel=(document.getElementById('reg-tel').value||'').trim();
+  var ddi=(document.getElementById('reg-ddi').value||'55').replace(/\D/g,'');
+  var telNum=(document.getElementById('reg-tel').value||'').replace(/\D/g,'');
+  var tel=telNum?'+'+ddi+telNum:'';
   var senha=document.getElementById('reg-senha').value||'';
   var senha2=document.getElementById('reg-senha2').value||'';
   if(!nome||!email||!senha){ showToast('Preencha todos os campos.',true); return; }
@@ -1311,6 +1460,7 @@ function fazerRegistro(){
     document.getElementById('reg-nome').value='';
     document.getElementById('reg-email').value='';
     document.getElementById('reg-tel').value='';
+    document.getElementById('reg-ddi').value='55';
     document.getElementById('reg-senha').value='';
     document.getElementById('reg-senha2').value='';
     mostrarTabLogin();
@@ -1428,6 +1578,7 @@ function resetarSenha(email){
 function init(){
   loadData();
   setLogoSrcs();
+  initDdiSelects();
   // Lightbox keyboard navigation
   document.addEventListener('keydown',function(e){
     var lb=document.getElementById('lightbox');

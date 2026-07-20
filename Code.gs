@@ -357,7 +357,7 @@ function doPost(e) {
         if (realHash === senhaHash) {
           var token = Utilities.getUuid();
           sheet.getRange(i + 1, 7).setValue(token);
-          var resp = {ok:true, token:token, nome:String(rows[i][1])};
+          var resp = {ok:true, token:token, nome:String(rows[i][1]), telefone:String(rows[i][3])};
           if (isTemp) resp.needs_password_change = true;
           return jsonOut(JSON.stringify(resp));
         }
@@ -447,6 +447,35 @@ function doPost(e) {
       }
     }
     return jsonOut(JSON.stringify({erro:'cliente não encontrado'}));
+  }
+
+  // ── Update client profile (email / phone) ──
+  if (tipo === 'atualizar_perfil') {
+    var token     = data.token || '';
+    var novoEmail = (data.novo_email || '').toLowerCase().trim();
+    var novoTel   = data.telefone || '';
+    if (!token) return jsonOut(JSON.stringify({erro:'não autenticado'}));
+    var ss    = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('CL_Clientes');
+    if (!sheet) return jsonOut(JSON.stringify({erro:'erro interno'}));
+    var rows = sheet.getDataRange().getValues();
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][6]) === token) {
+        var emailAtual = String(rows[i][2]).toLowerCase();
+        if (novoEmail && novoEmail !== emailAtual) {
+          for (var j = 0; j < rows.length; j++) {
+            if (j !== i && String(rows[j][2]).toLowerCase() === novoEmail) {
+              return jsonOut(JSON.stringify({erro:'e-mail já cadastrado por outro usuário'}));
+            }
+          }
+          sheet.getRange(i + 1, 3).setValue(novoEmail);
+          emailAtual = novoEmail;
+        }
+        if (novoTel) sheet.getRange(i + 1, 4).setValue(novoTel);
+        return jsonOut(JSON.stringify({ok:true, email:emailAtual}));
+      }
+    }
+    return jsonOut(JSON.stringify({erro:'sessão inválida'}));
   }
 
   return jsonOut(JSON.stringify({erro:'tipo desconhecido: ' + tipo}));
