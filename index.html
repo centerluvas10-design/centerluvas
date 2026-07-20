@@ -310,6 +310,13 @@ textarea{resize:vertical;min-height:55px;}
 .sp-cancel{width:100%;padding:13px;border:none;background:var(--bg);border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;color:var(--muted);-webkit-appearance:none;}
 /* ── CART SIZE BADGE ── */
 .ci-tam{font-size:11px;font-weight:700;color:var(--p);background:#e8f4f7;border-radius:6px;padding:1px 6px;margin-left:4px;}
+/* ── PER-SIZE STOCK ── */
+.sz-stock-row{display:flex;flex-wrap:wrap;gap:4px;}
+.sz-stock-item{display:flex;flex-direction:column;align-items:center;gap:1px;}
+.sz-stock-item label{font-size:10px;color:var(--muted);font-weight:700;line-height:1;}
+.sz-stock-input{width:44px;border:1.5px solid var(--border);border-radius:6px;padding:3px 4px;font-size:12px;text-align:center;-webkit-appearance:none;}
+/* ── ADMIN VENDAS SIZE SELECT ── */
+.prod-tam-field{display:none;}
 </style>
 </head>
 <body>
@@ -1046,6 +1053,13 @@ function deleteAllImgExtraDrive(prodId){
 }
 
 // ── PRODUCT NAME + SIZES (ADMIN) ──
+function recalcEstoque(p){
+  if(p.tamanhos&&p.tamanhos.length){
+    if(!p.estoqueTams) p.estoqueTams={};
+    p.estoque=p.tamanhos.reduce(function(s,t){ return s+(p.estoqueTams[t]||0); },0);
+  }
+}
+
 function updNome(i,v){
   v=(v||'').trim();
   if(!v||!produtos[i]) return;
@@ -1064,6 +1078,8 @@ function addTamanhoSel(i,sel){
   if(!produtos[i].tamanhos) produtos[i].tamanhos=[];
   if(produtos[i].tamanhos.indexOf(tam)===-1){
     produtos[i].tamanhos.push(tam);
+    if(!produtos[i].estoqueTams) produtos[i].estoqueTams={};
+    if(!(tam in produtos[i].estoqueTams)) produtos[i].estoqueTams[tam]=0;
     save(); syncProdutos(); renderAdminEstoque();
   }
 }
@@ -1073,6 +1089,8 @@ function removeTamanho(i,tam){
   var idx=produtos[i].tamanhos.indexOf(tam);
   if(idx!==-1){
     produtos[i].tamanhos.splice(idx,1);
+    if(produtos[i].estoqueTams) delete produtos[i].estoqueTams[tam];
+    recalcEstoque(produtos[i]);
     save(); syncProdutos(); renderAdminEstoque();
   }
 }
@@ -1083,8 +1101,11 @@ function abrirSizePicker(prodId){
   if(!p||!p.tamanhos||!p.tamanhos.length) return addCart(prodId);
   spTargetId=prodId;
   document.getElementById('sp-title').textContent='Tamanho — '+p.nome;
+  var et=p.estoqueTams||{};
   document.getElementById('sp-chips').innerHTML=p.tamanhos.map(function(t){
-    return '<button class="sp-chip" onclick="addCartComTamanho(\''+prodId+'\',\''+esc(t)+'\')">'+esc(t)+'</button>';
+    var stk=(et[t]||0);
+    var dis=stk<=0;
+    return '<button class="sp-chip" '+(dis?'disabled style="opacity:.4;cursor:not-allowed"':'onclick="addCartComTamanho(\''+prodId+'\',\''+esc(t)+'\')"')+'>'+esc(t)+(dis?' <span style="font-size:10px;font-weight:400">(sem estoque)</span>':'')+'</button>';
   }).join('');
   document.getElementById('size-picker-ov').style.display='flex';
 }
@@ -1096,10 +1117,16 @@ function fecharSizePicker(){
 function addCartComTamanho(prodId,tamanho){
   fecharSizePicker();
   var p=produtos.find(function(x){return x.id===prodId;});
-  if(!p||p.estoque<=0) return;
+  if(!p) return;
+  var maxStk=(p.estoqueTams&&tamanho)?((p.estoqueTams[tamanho])||0):p.estoque;
+  if(maxStk<=0){ showToast('Sem estoque para este tamanho.',true); return; }
   var ci=carrinho.find(function(c){return c.id===prodId&&c.tamanho===tamanho;});
-  if(ci){ if(ci.qty<p.estoque) ci.qty++; }
-  else carrinho.push({id:prodId,qty:1,nome:p.nome,preco:p.preco,emoji:p.emoji,tamanho:tamanho});
+  if(ci){
+    if(ci.qty<maxStk) ci.qty++;
+    else showToast('Estoque máximo atingido para '+tamanho+'.',true);
+  } else {
+    carrinho.push({id:prodId,qty:1,nome:p.nome,preco:p.preco,emoji:p.emoji,tamanho:tamanho});
+  }
   renderLoja();
 }
 
@@ -1441,7 +1468,7 @@ function fetchRemoteConfig(){
         data.forEach(function(srv){
           var local=produtos.find(function(x){ return String(x.id)===String(srv.id); });
           if(!local){ produtos.push(srv); }
-          else{ Object.keys(srv).forEach(function(k){ if(k!=='estoque') local[k]=srv[k]; }); }
+          else{ Object.keys(srv).forEach(function(k){ if(k!=='estoque'&&k!=='estoqueTams') local[k]=srv[k]; }); }
         });
         produtos=produtos.filter(function(loc){ return data.some(function(srv){ return String(srv.id)===String(loc.id); }); });
       } else {
@@ -1570,10 +1597,13 @@ function renderLoja(){
     var hasTams=!!(p.tamanhos&&p.tamanhos.length);
     var ci=hasTams?null:carrinho.find(function(c){return c.id===p.id&&!c.tamanho;});
     var qty=ci?ci.qty:0;
-    var stockTxt=p.estoque<=0?'Sem estoque':p.estoque<=10?'Últimas unidades':'Em estoque';
-    var stockCls=p.estoque<=0?'stock-out':p.estoque<=10?'stock-low':'stock-ok';
+    var temEstoque=hasTams
+      ?p.tamanhos.some(function(t){return ((p.estoqueTams||{})[t]||0)>0;})
+      :p.estoque>0;
+    var stockTxt=!temEstoque?'Sem estoque':p.estoque<=10?'Últimas unidades':'Em estoque';
+    var stockCls=!temEstoque?'stock-out':p.estoque<=10?'stock-low':'stock-ok';
     var actHtml;
-    if(p.estoque<=0){
+    if(!temEstoque){
       actHtml='<button class="atc-btn" disabled>Sem estoque</button>';
     } else if(hasTams){
       var inCart=carrinho.some(function(c){return c.id===p.id;});
@@ -1749,8 +1779,13 @@ function confirmarPedido(){
   // decrement stock and sync to server
   pedidoAtual.itens.forEach(function(item){
     var p=produtos.find(function(x){ return String(x.id)===String(item.id); });
-    if(p) p.estoque=Math.max(0,p.estoque-item.qty);
-    else console.warn('confirmarPedido: produto não encontrado para id='+item.id+', ids disponíveis='+produtos.map(function(x){return x.id;}).join(','));
+    if(!p){ console.warn('confirmarPedido: produto não encontrado para id='+item.id); return; }
+    if(item.tamanho&&p.estoqueTams){
+      p.estoqueTams[item.tamanho]=Math.max(0,(p.estoqueTams[item.tamanho]||0)-item.qty);
+      recalcEstoque(p);
+    } else {
+      p.estoque=Math.max(0,p.estoque-item.qty);
+    }
   });
   pedidos.push(pedidoAtual);
   localStorage.setItem('cl_sync_ts', String(Date.now()));
@@ -1930,7 +1965,16 @@ function renderAdminEstoque(){
       })()+
       '</div></td>'+
       '<td>R$ <input class="sml-input" type="number" value="'+p.preco.toFixed(2)+'" step="0.01" min="0" onchange="updPreco('+i+',this.value)" style="width:72px"></td>'+
-      '<td><input class="sml-input" type="number" value="'+p.estoque+'" min="0" onchange="updEstoque('+i+',this.value)"></td>'+
+      (function(){
+        if(p.tamanhos&&p.tamanhos.length){
+          var et=p.estoqueTams||{};
+          var inputs=p.tamanhos.map(function(t){
+            return '<div class="sz-stock-item"><label>'+esc(t)+'</label><input class="sz-stock-input" type="number" min="0" value="'+(et[t]||0)+'" onchange="updEstoqueTam('+i+',\''+esc(t)+'\',this.value)"></div>';
+          }).join('');
+          return '<td><div class="sz-stock-row">'+inputs+'</div><small style="color:var(--muted);font-size:10px">Total: '+p.estoque+'</small></td>';
+        }
+        return '<td><input class="sml-input" type="number" value="'+p.estoque+'" min="0" onchange="updEstoque('+i+',this.value)"></td>';
+      })()+
       '<td><button class="sml-btn '+(p.ativo?'btn-green':'btn-red')+'" onclick="toggleProd('+i+')">'+(p.ativo?'✓ Ativo':'✕ Inativo')+'</button></td>'+
       '<td><button class="sml-btn btn-red" onclick="removeProd('+i+')">🗑</button></td></tr>';
   }).join('');
@@ -1938,6 +1982,15 @@ function renderAdminEstoque(){
 
 function updPreco(i,v){ produtos[i].preco=parseFloat(v)||0; save(); syncProdutos(); }
 function updEstoque(i,v){ produtos[i].estoque=parseInt(v)||0; save(); syncProdutos(); showToast('Estoque atualizado!'); }
+function updEstoqueTam(i,tam,v){
+  if(!produtos[i]) return;
+  if(!produtos[i].estoqueTams) produtos[i].estoqueTams={};
+  produtos[i].estoqueTams[tam]=Math.max(0,parseInt(v)||0);
+  recalcEstoque(produtos[i]);
+  save(); syncProdutos();
+  renderAdminEstoque();
+  showToast('Estoque de '+tam+' atualizado!');
+}
 function toggleProd(i){ produtos[i].ativo=!produtos[i].ativo; save(); syncProdutos(); renderAdminEstoque(); showToast('Produto '+(produtos[i].ativo?'ativado':'desativado')+'.'); }
 function removeProd(i){
   if(!confirm('Remover "'+produtos[i].nome+'"?')) return;
@@ -2087,11 +2140,27 @@ function addLine(nome,qtd,preco,obs){
   nome=nome||''; qtd=qtd||1; preco=preco||''; obs=obs||'';
   var list=document.getElementById('products-list'); if(!list) return;
   var div=document.createElement('div'); div.className='prod-block';
-  div.innerHTML='<div class="prod-top"><div class="field" style="margin:0"><label>Produto</label><select class="prod-nome">'+prodOpts(nome)+'</select></div><div class="field" style="margin:0"><label>Qtd</label><input type="number" class="prod-qtd" min="1" value="'+qtd+'" /></div><div class="field" style="margin:0"><label>Valor unit.</label><input type="number" class="prod-preco" min="0" step="0.01" placeholder="0,00" value="'+preco+'" /></div><button class="remove-btn" onclick="removeLine(this)">×</button></div><input class="prod-obs" type="text" placeholder="Obs. deste produto (opcional)" value="'+obs+'" />';
+  div.innerHTML='<div class="prod-top"><div class="field" style="margin:0"><label>Produto</label><select class="prod-nome">'+prodOpts(nome)+'</select></div><div class="field prod-tam-field" style="margin:0"><label>Tamanho</label><select class="prod-tam"><option value="">Selecione</option></select></div><div class="field" style="margin:0"><label>Qtd</label><input type="number" class="prod-qtd" min="1" value="'+qtd+'" /></div><div class="field" style="margin:0"><label>Valor unit.</label><input type="number" class="prod-preco" min="0" step="0.01" placeholder="0,00" value="'+preco+'" /></div><button class="remove-btn" onclick="removeLine(this)">×</button></div><input class="prod-obs" type="text" placeholder="Obs. deste produto (opcional)" value="'+obs+'" />';
   list.appendChild(div);
-  div.querySelector('.prod-nome').addEventListener('change',function(){
-    var prod=produtos.find(function(x){ return x.id===this.value; },this);
-    if(prod){ div.querySelector('.prod-preco').value=prod.preco.toFixed(2); calcTotal(); }
+  var selNome=div.querySelector('.prod-nome');
+  var tamField=div.querySelector('.prod-tam-field');
+  var selTam=div.querySelector('.prod-tam');
+  selNome.addEventListener('change',function(){
+    var prod=produtos.find(function(x){ return x.id===selNome.value; });
+    if(prod){
+      div.querySelector('.prod-preco').value=prod.preco.toFixed(2);
+      if(prod.tamanhos&&prod.tamanhos.length){
+        var et=prod.estoqueTams||{};
+        selTam.innerHTML='<option value="">Selecione</option>'+prod.tamanhos.map(function(t){
+          return '<option value="'+esc(t)+'">'+esc(t)+' (est: '+(et[t]||0)+')</option>';
+        }).join('');
+        tamField.style.display='block';
+      } else {
+        tamField.style.display='none';
+        selTam.innerHTML='<option value="">—</option>';
+      }
+      calcTotal();
+    }
   });
   div.querySelectorAll('.prod-qtd,.prod-preco').forEach(function(inp){ inp.addEventListener('input',calcTotal); });
 }
@@ -2120,28 +2189,37 @@ function registrarVenda(){
   var prods2=[]; var total2=0; var ok=true;
   document.querySelectorAll('.prod-block').forEach(function(b){
     var pid=b.querySelector('.prod-nome').value;
+    var tamField=b.querySelector('.prod-tam-field');
+    var tam=tamField&&tamField.style.display!=='none'?b.querySelector('.prod-tam').value:'';
     var q=parseFloat(b.querySelector('.prod-qtd').value)||0;
     var prc=parseFloat(b.querySelector('.prod-preco').value)||0;
     var ob=b.querySelector('.prod-obs').value.trim();
-    if(!pid||q<=0||prc<=0){ ok=false; return; }
     var prod=produtos.find(function(x){ return x.id===pid; });
+    if(!pid||q<=0||prc<=0){ ok=false; return; }
+    if(prod&&prod.tamanhos&&prod.tamanhos.length&&!tam){ showToast('Selecione o tamanho de "'+prod.nome+'".',true); ok=false; return; }
     var n=prod?prod.nome:pid;
-    prods2.push({id:pid,nome:n,qtd:q,preco:prc,obs:ob}); total2+=q*prc;
+    prods2.push({id:pid,nome:n,qtd:q,preco:prc,obs:ob,tamanho:tam}); total2+=q*prc;
   });
   if(!ok||!prods2.length){ showToast('Preencha todos os produtos corretamente.',true); return; }
   var obs2=(document.getElementById('obs').value||'').trim();
   var id='V'+Date.now(); var now=new Date().toLocaleString('pt-BR');
   var venda={id:id,data:now,cliente:cliente,pagamento:pagamento,produtos:prods2,total:total2,obs:obs2};
   vendas.push(venda); ultimaVenda=venda;
-  // decrement stock
+  // decrement stock (per size or global)
   prods2.forEach(function(item){
     var p=produtos.find(function(x){ return x.id===item.id; });
-    if(p) p.estoque=Math.max(0,p.estoque-item.qtd);
+    if(!p) return;
+    if(item.tamanho&&p.estoqueTams){
+      p.estoqueTams[item.tamanho]=Math.max(0,(p.estoqueTams[item.tamanho]||0)-item.qtd);
+      recalcEstoque(p);
+    } else {
+      p.estoque=Math.max(0,p.estoque-item.qtd);
+    }
   });
   save(); syncProdutos(); renderAdminEstoque();
   var btn=document.getElementById('submit-btn'); var st=document.getElementById('sync-status');
   btn.disabled=true; btn.textContent='Enviando...'; st.textContent='';
-  var ps=prods2.map(function(p2){ return p2.qtd+'x '+p2.nome+' (R$'+p2.preco.toFixed(2)+')'+(p2.obs?' ['+p2.obs+']':''); }).join(' | ');
+  var ps=prods2.map(function(p2){ return p2.qtd+'x '+p2.nome+(p2.tamanho?' ['+p2.tamanho+']':'')+' (R$'+p2.preco.toFixed(2)+')'+(p2.obs?' ['+p2.obs+']':''); }).join(' | ');
   fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({tipo:'venda',id:id,data:now,cliente:cliente,pagamento:pagamento,produtos:ps,total:total2.toFixed(2),obs:obs2})})
     .then(function(){ st.textContent='✅ Salvo no Google Sheets'; st.className='sync-status ok'; })
     .catch(function(){ st.textContent='⚠️ Sem internet — salvo localmente'; st.className='sync-status err'; })
