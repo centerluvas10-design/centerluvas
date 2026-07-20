@@ -757,7 +757,7 @@ function loadData(){
     prodImgs={};
     Object.keys(_stored).forEach(function(k){
       var v=_stored[k]||'';
-      if(v.indexOf('http')===0||(v.indexOf('data:image/')===0&&v.length>300)) prodImgs[k]=v;
+      if(v.indexOf('data:image/')===0&&v.length>300) prodImgs[k]=v;
     });
   }catch(e){ prodImgs={}; }
   carrinho = []; catAtiva = 'Todos'; pagSel = 'pix'; tipoEntrega = 'entrega'; pedidoAtual = null; ultimaVenda = null;
