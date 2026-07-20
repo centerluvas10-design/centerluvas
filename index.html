@@ -1524,8 +1524,10 @@ function renderClientesFiltrados(){
   el.innerHTML=lista.map(function(c){
     var wppBtn='';
     if(c.telefone){
+      var pt=parseTel(c.telefone);
+      var wppNum=pt.ddi+pt.num;
       var wm='Olá '+c.nome+'! Tudo bem? 😊';
-      wppBtn='<a class="oact-btn" style="border-color:#25D366;color:#25D366;text-decoration:none" href="https://wa.me/'+c.telefone.replace(/\D/g,'')+'?text='+encodeURIComponent(wm)+'" target="_blank">💬 WhatsApp</a>';
+      wppBtn='<a class="oact-btn" style="border-color:#25D366;color:#25D366;text-decoration:none" href="https://wa.me/'+wppNum+'?text='+encodeURIComponent(wm)+'" target="_blank">💬 WhatsApp</a>';
     }
     return '<div class="cliente-card">'+
       '<div class="cliente-nome">'+esc(c.nome)+'</div>'+
