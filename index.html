@@ -1372,11 +1372,19 @@ function renderClientesFiltrados(){
     :clientesList;
   if(!lista.length){ el.innerHTML='<div class="empty">Nenhum cliente encontrado.</div>'; return; }
   el.innerHTML=lista.map(function(c){
+    var wppBtn='';
+    if(c.telefone){
+      var wm='Olá '+c.nome+'! Tudo bem? 😊';
+      wppBtn='<a class="oact-btn" style="border-color:#25D366;color:#25D366;text-decoration:none" href="https://wa.me/'+c.telefone.replace(/\D/g,'')+'?text='+encodeURIComponent(wm)+'" target="_blank">💬 WhatsApp</a>';
+    }
     return '<div class="cliente-card">'+
       '<div class="cliente-nome">'+esc(c.nome)+'</div>'+
       '<div class="cliente-info">'+esc(c.email)+(c.telefone?' · '+esc(c.telefone):'')+'</div>'+
       '<div class="cliente-info">Cadastro: '+esc(c.data_cadastro||c.criado_em||'')+'</div>'+
-      '<button class="reset-pass-btn" onclick="resetarSenha(\''+esc(c.email)+'\')">🔑 Resetar senha</button>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'+
+        '<button class="reset-pass-btn" style="margin-top:0" onclick="resetarSenha(\''+esc(c.email)+'\')">🔑 Resetar senha</button>'+
+        wppBtn+
+      '</div>'+
       '</div>';
   }).join('');
 }
