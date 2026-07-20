@@ -406,6 +406,24 @@ function doPost(e) {
       data.cliente_email || '',
       data.status        || 'aguardando'
     ]);
+    try {
+      var nomeCliente = data.cliente || data.cliente_nome || 'Cliente';
+      var totalFmt    = 'R$ ' + (parseFloat(data.total) || 0).toFixed(2).replace('.', ',');
+      MailApp.sendEmail({
+        to:      'centerluvas10@gmail.com',
+        subject: '🛍️ Novo pedido — ' + nomeCliente + ' · ' + totalFmt,
+        body:    'Novo pedido recebido!\n\n'
+               + 'Cliente:    ' + nomeCliente                         + '\n'
+               + 'E-mail:     ' + (data.cliente_email || '—')         + '\n'
+               + 'Telefone:   ' + (data.telefone      || '—')         + '\n'
+               + 'Total:      ' + totalFmt                             + '\n'
+               + 'Pagamento:  ' + (data.pagamento     || '—')         + '\n'
+               + 'Endereço:   ' + (data.endereco      || '—')         + '\n'
+               + 'Produtos:   ' + (data.produtos      || '—')         + '\n'
+               + (data.obs ? 'Obs:        ' + data.obs + '\n' : '')
+               + '\nAcesse o painel admin para confirmar o pedido.'
+      });
+    } catch(e) {}
     return jsonOut(JSON.stringify({ok:true}));
   }
 

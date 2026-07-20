@@ -826,6 +826,8 @@ var prodImgs = {};
 var prodImgsExtra = {};
 var _imgBadIds = {};
 var pedidosList = [];
+var _notifPollInterval = null;
+var _notifLastCount = -1;
 var imgTargetIdx = -1;
 var imgExtraTargetId = '';
 var lbImagens = [];
@@ -2088,12 +2090,69 @@ function _abrirPainelAdmin(){
   renderAdminConfig();
   addLine();
   renderAdminClientes();
+  initNotificacoes();
 }
 
 function sairAdmin(){
   localStorage.removeItem('admin_logged');
+  stopNotificacoes();
   mostrarLoja();
   showToast('Sessão admin encerrada.');
+}
+
+function initNotificacoes(){
+  if(_notifPollInterval) clearInterval(_notifPollInterval);
+  _notifLastCount=-1;
+  if('Notification' in window && Notification.permission==='default'){
+    Notification.requestPermission();
+  }
+  _notifPollInterval=setInterval(pollNovoPedido,30000);
+}
+
+function stopNotificacoes(){
+  if(_notifPollInterval){ clearInterval(_notifPollInterval); _notifPollInterval=null; }
+  _notifLastCount=-1;
+}
+
+function pollNovoPedido(){
+  if(!cfg.adminPass) return;
+  fetch(SCRIPT_URL+'?type=pedidos&admin_pass='+encodeURIComponent(cfg.adminPass)+'&_='+Date.now(),{redirect:'follow'})
+    .then(function(r){ return r.text(); })
+    .then(function(txt){
+      var lista; try{ lista=JSON.parse(txt); }catch(e){ return; }
+      if(!Array.isArray(lista)) return;
+      var count=lista.length;
+      if(_notifLastCount===-1){ _notifLastCount=count; return; }
+      if(count>_notifLastCount){
+        var novos=count-_notifLastCount;
+        _notifLastCount=count;
+        pedidosList=lista;
+        renderPedidosList();
+        mostrarNotifPedido(novos,lista[lista.length-1]);
+      }
+    })
+    .catch(function(){});
+}
+
+function mostrarNotifPedido(qtd,ultimo){
+  try{
+    var ctx=new(window.AudioContext||window.webkitAudioContext)();
+    var osc=ctx.createOscillator(); var gain=ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value=880;
+    gain.gain.setValueAtTime(0.3,ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.5);
+    osc.start(); osc.stop(ctx.currentTime+0.5);
+  }catch(e){}
+  showToast('🛍️ '+(qtd>1?qtd+' novos pedidos recebidos!':'Novo pedido de '+(ultimo&&ultimo.cliente_nome||'cliente')+'!'));
+  if(!('Notification' in window)) return;
+  if(Notification.permission!=='granted'){ Notification.requestPermission(); return; }
+  var nome=(ultimo&&ultimo.cliente_nome)||'Cliente';
+  var total=(ultimo&&ultimo.total)?'R$ '+parseFloat(ultimo.total).toFixed(2).replace('.',','):'';
+  new Notification('🛍️ Novo pedido — Center Luvas',{
+    body:qtd>1?(qtd+' novos pedidos recebidos!'):('De: '+nome+(total?' · '+total:'')),
+    tag:'novo-pedido'
+  });
 }
 
 var activeAdminTab='estoque';
