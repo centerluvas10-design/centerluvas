@@ -776,6 +776,19 @@ function loadData(){
       if(v.indexOf('data:image/')===0&&v.length>300) prodImgs[id]=v;
     });
   }catch(e){ prodImgs={}; }
+  // Fallback: URL do Drive salva localmente (backup pequeno)
+  try{
+    var _urlKeys=[];
+    for(var _ui=0;_ui<localStorage.length;_ui++){
+      var _uk=localStorage.key(_ui);
+      if(_uk&&_uk.indexOf('cl_imgurl_')===0) _urlKeys.push(_uk);
+    }
+    _urlKeys.forEach(function(uk){
+      var id=uk.slice(10);
+      var url=localStorage.getItem(uk)||'';
+      if(url.indexOf('http')===0&&!prodImgs[id]) prodImgs[id]=url;
+    });
+  }catch(e){}
   carrinho = []; catAtiva = 'Todos'; pagSel = 'pix'; tipoEntrega = 'entrega'; pedidoAtual = null; ultimaVenda = null;
 }
 
@@ -797,6 +810,7 @@ function saveImgs(){
 }
 function removeImgLocal(id){
   try{ localStorage.removeItem('cl_img_'+id); }catch(e){}
+  try{ localStorage.removeItem('cl_imgurl_'+id); }catch(e){}
 }
 
 // ══════════ PIX BR CODE ══════════
@@ -873,11 +887,23 @@ function uploadImgProd(file){
   comprimirImagem(file).then(function(dataUrl){
     prodImgs[id]=dataUrl;
     saveImgs();
+    // Verifica se o base64 foi realmente gravado no localStorage
+    var check=(localStorage.getItem('cl_img_'+id)||'').length>300;
+    if(!check) showToast('⚠ Foto não gravada localmente (sem espaço?). Enviando para Drive...', true);
     renderAdminEstoque();
     renderLoja();
-    showToast('Enviando foto...');
-    // Sobe para Drive em segundo plano; base64 local NÃO é substituído
-    syncImgProdDrive(id,dataUrl,function(){ showToast('Foto salva!'); });
+    if(check) showToast('Enviando foto...');
+    syncImgProdDrive(id,dataUrl,function(url){
+      if(url){
+        // Salva URL do Drive como backup (string pequena, sempre funciona)
+        try{
+          localStorage.setItem('cl_imgurl_'+id,url);
+        }catch(e){}
+        showToast('Foto salva!');
+      } else {
+        showToast(check?'Foto salva localmente.':'⚠ Falha ao enviar foto.',!check);
+      }
+    });
   }).catch(function(){ showToast('Erro ao processar imagem.',true); });
 }
 
@@ -1205,7 +1231,11 @@ function fetchRemoteConfig(){
         if(_imgBadIds[k]) return; // skip IDs that failed to load this session
         if(v.indexOf('data:image/')===0&&v.length<300) return; // reject short/corrupted base64
         var local=prodImgs[k]||'';
-        if(!local) prodImgs[k]=v;
+        if(!local){
+          prodImgs[k]=v;
+          // Persiste URL do Drive localmente como fallback (string pequena)
+          if(v.indexOf('http')===0) try{ localStorage.setItem('cl_imgurl_'+k,v); }catch(e){}
+        }
       });
       saveImgs();
       renderLoja();
