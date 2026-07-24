@@ -1655,13 +1655,20 @@ function fetchRemoteConfig(){
       Object.keys(data).forEach(function(k){
         var v=data[k]||'';
         if(!v) return;
-        if(_imgBadIds[k]) return; // skip IDs that failed to load this session
-        if(v.indexOf('data:image/')===0&&v.length<300) return; // reject short/corrupted base64
-        var local=prodImgs[k]||'';
-        if(!local){
-          prodImgs[k]=v;
-          // Persiste URL do Drive localmente como fallback (string pequena)
-          if(v.indexOf('http')===0) try{ localStorage.setItem('cl_imgurl_'+k,v); }catch(e){}
+        if(_imgBadIds[k]) return;
+        if(v.indexOf('data:image/')===0&&v.length<300) return;
+        if(v.indexOf('http')===0){
+          // URL do Drive: atualiza sempre que a URL mudou (imagem trocada no admin)
+          var storedUrl=localStorage.getItem('cl_imgurl_'+k)||'';
+          if(v!==storedUrl){
+            prodImgs[k]=v;
+            try{ localStorage.setItem('cl_imgurl_'+k,v); }catch(e){}
+            try{ localStorage.removeItem('cl_img_'+k); }catch(e){} // limpa base64 antigo
+          } else if(!prodImgs[k]){
+            prodImgs[k]=v;
+          }
+        } else {
+          if(!prodImgs[k]) prodImgs[k]=v;
         }
       });
       saveImgs();
